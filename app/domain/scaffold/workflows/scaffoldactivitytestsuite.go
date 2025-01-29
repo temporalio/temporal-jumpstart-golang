@@ -21,7 +21,7 @@ func (s *ScaffoldActivityTestSuite) SetupSuite() {
 
 // SetupTest https://pkg.go.dev/github.com/stretchr/testify/suite#SetupTestSuite
 // CAREFUL not to put this `env` inside the SetupSuite or else you will
-// get interleaved test times between parallel tests (testify runs suite tests in parallel)
+// get interleaved test times between parallel tests
 func (s *ScaffoldActivityTestSuite) SetupTest() {
 	s.env = s.NewTestWorkflowEnvironment()
 }

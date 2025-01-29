@@ -15,6 +15,6 @@ type MyWorkflowActivities interface {
 }
 
 func (workflows *Workflows) MyWorkflow(ctx workflow.Context, args *workflows.StartMyWorkflowRequest) error {
-	workflow.Sleep(ctx, time.Second)
+	workflow.Sleep(ctx, time.Second*1)
 	return nil
 }

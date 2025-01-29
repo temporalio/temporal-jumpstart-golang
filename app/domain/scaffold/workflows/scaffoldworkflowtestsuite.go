@@ -21,7 +21,7 @@ func (s *ScaffoldWorkflowTestSuite) SetupSuite() {
 
 // SetupTest https://pkg.go.dev/github.com/stretchr/testify/suite#SetupTestSuite
 // CAREFUL not to put this `env` inside the SetupSuite or else you will
-// get interleaved test times between parallel tests (testify runs suite tests in parallel)
+// get interleaved test times between parallel tests
 func (s *ScaffoldWorkflowTestSuite) SetupTest() {
 	s.env = s.NewTestWorkflowEnvironment()
 }
@@ -36,6 +36,10 @@ func (s *ScaffoldWorkflowTestSuite) AfterTest(suiteName, testName string) {
 	s.env.AssertExpectations(s.T())
 }
 
+// TearDownSuite TearDownAllSuite has a TearDownSuite method, which will run after all the tests in the suite have been run.
+func (s *ScaffoldWorkflowTestSuite) TearDownSuite() {
+
+}
 func TestScaffoldWorkflow(t *testing.T) {
 	suite.Run(t, &ScaffoldWorkflowTestSuite{})
 }
