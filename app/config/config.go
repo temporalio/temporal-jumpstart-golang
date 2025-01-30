@@ -2,6 +2,7 @@ package config
 
 import (
 	"errors"
+	"fmt"
 	"os"
 	"strconv"
 	"strings"
@@ -72,7 +73,14 @@ type APIConfig struct {
 	URL  string
 }
 
-func LoadConfig() (*Config, error) {
+func MustNewConfig() *Config {
+	cfg, err := NewConfig()
+	if err != nil {
+		panic(fmt.Sprintf("failed to initialize config: %v", err))
+	}
+	return cfg
+}
+func NewConfig() (*Config, error) {
 	err := godotenv.Load()
 	if err != nil {
 		return nil, err

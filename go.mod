@@ -7,9 +7,11 @@ require (
 	github.com/gorilla/mux v1.8.1
 	github.com/joho/godotenv v1.5.1
 	github.com/stretchr/testify v1.10.0
+	github.com/uber-go/tally/v4 v4.1.16
 	go.temporal.io/api v1.43.2
 	go.temporal.io/sdk v1.32.1
 	go.temporal.io/sdk/contrib/resourcetuner v0.0.0-20250128201316-7728bd7b72d2
+	go.temporal.io/sdk/contrib/tally v0.2.0
 )
 
 require (
@@ -37,8 +39,10 @@ require (
 	github.com/stretchr/objx v0.5.2 // indirect
 	github.com/tklauser/go-sysconf v0.3.12 // indirect
 	github.com/tklauser/numcpus v0.6.1 // indirect
+	github.com/twmb/murmur3 v1.1.5 // indirect
 	github.com/yusufpapurcu/wmi v1.2.4 // indirect
 	go.einride.tech/pid v0.1.3 // indirect
+	go.uber.org/atomic v1.9.0 // indirect
 	golang.org/x/exp v0.0.0-20231127185646-65229373498e // indirect
 	golang.org/x/net v0.28.0 // indirect
 	golang.org/x/sync v0.8.0 // indirect
