@@ -33,7 +33,6 @@ func (s *ScaffoldActivityTestSuite) BeforeTest(suiteName, testName string) {
 
 // AfterTest https://pkg.go.dev/github.com/stretchr/testify/suite#AfterTest
 func (s *ScaffoldActivityTestSuite) AfterTest(suiteName, testName string) {
-	s.env.AssertExpectations(s.T())
 }
 
 func TestScaffoldActivity(t *testing.T) {

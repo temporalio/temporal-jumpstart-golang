@@ -10,9 +10,9 @@ import (
 )
 
 type Config struct {
-	Temporal     TemporalConfig
+	Temporal     *TemporalConfig
 	IsProduction bool
-	API          APIConfig
+	API          *APIConfig
 }
 
 type MTLSConfig struct {
@@ -37,6 +37,11 @@ type TemporalWorkerCapacity struct {
 	MaxCachedWorkflows                  int
 }
 
+type TemporalWorkerTuner struct {
+	TargetMem float64
+	TargetCPU float64
+}
+
 type TemporalWorkerRateLimits struct {
 	MaxWorkerActivitiesPerSecond    int
 	MaxTaskQueueActivitiesPerSecond int
@@ -45,58 +50,58 @@ type TemporalWorkerRateLimits struct {
 type TemporalWorker struct {
 	TaskQueue  string
 	Name       string
-	Capacity   TemporalWorkerCapacity
-	RateLimits TemporalWorkerRateLimits
-	BundlePath string
+	Capacity   *TemporalWorkerCapacity
+	RateLimits *TemporalWorkerRateLimits
+	Tuner      *TemporalWorkerTuner
 }
 
 type TemporalConnection struct {
 	Namespace string
 	Target    string
-	MTLS      MTLSConfig
+	MTLS      *MTLSConfig
 }
 
 type TemporalConfig struct {
-	Connection TemporalConnection
-	Worker     TemporalWorker
+	Connection *TemporalConnection
+	Worker     *TemporalWorker
 }
 
 type APIConfig struct {
 	Port string
-	MTLS MTLSConfig
+	MTLS *MTLSConfig
 	URL  string
 }
 
-func LoadConfig() (Config, error) {
+func LoadConfig() (*Config, error) {
 	err := godotenv.Load()
 	if err != nil {
-		return Config{}, err
+		return nil, err
 	}
 
 	apiCfg, err := createApiCfg()
 	if err != nil {
-		return Config{}, err
+		return nil, err
 	}
 
 	temporalCfg, err := createTemporalCfg()
 	if err != nil {
-		return Config{}, err
+		return nil, err
 	}
 
-	return Config{
+	return &Config{
 		Temporal:     temporalCfg,
 		IsProduction: strings.ToLower(os.Getenv("ENV")) == "production",
 		API:          apiCfg,
 	}, nil
 }
 
-func createApiCfg() (APIConfig, error) {
+func createApiCfg() (*APIConfig, error) {
 	apiUrl := os.Getenv("API_URL")
 	if apiUrl == "" {
 		apiUrl = "https://localhost:4000/api"
 	}
 
-	mtls := MTLSConfig{
+	mtls := &MTLSConfig{
 		CertChainFile:               os.Getenv("API_CONNECTION_MTLS_CERT_CHAIN_FILE"),
 		KeyFile:                     os.Getenv("API_CONNECTION_MTLS_KEY_FILE"),
 		PKCS:                        os.Getenv("API_CONNECTION_MTLS_PKCS"),
@@ -107,18 +112,18 @@ func createApiCfg() (APIConfig, error) {
 	}
 
 	if strings.HasPrefix(apiUrl, "https") && (mtls.CertChainFile == "" || mtls.KeyFile == "") {
-		return APIConfig{}, errors.New("Invalid config: HTTPS requires API_CONNECTION_MTLS* settings")
+		return nil, errors.New("Invalid config: HTTPS requires API_CONNECTION_MTLS* settings")
 	}
 
-	return APIConfig{
+	return &APIConfig{
 		Port: apiUrl,
 		MTLS: mtls,
 		URL:  apiUrl,
 	}, nil
 }
 
-func createTemporalCfg() (TemporalConfig, error) {
-	mtls := MTLSConfig{
+func createTemporalCfg() (*TemporalConfig, error) {
+	mtls := &MTLSConfig{
 		CertChainFile:               os.Getenv("TEMPORAL_CONNECTION_MTLS_CERT_CHAIN_FILE"),
 		KeyFile:                     os.Getenv("TEMPORAL_CONNECTION_MTLS_KEY_FILE"),
 		PKCS:                        os.Getenv("TEMPORAL_CONNECTION_MTLS_PKCS"),
@@ -146,37 +151,47 @@ func createTemporalCfg() (TemporalConfig, error) {
 		mtls.ServerRootCACertificate, _ = os.ReadFile(mtls.ServerRootCACertificateFile)
 	}
 
-	worker := TemporalWorker{
-		Capacity: TemporalWorkerCapacity{
-			MaxConcurrentWorkflowTaskExecutions: numOrNot("TEMPORAL_WORKER_CAPACITY_MAX_CONCURRENT_WORKFLOW_TASK_EXECUTORS"),
-			MaxConcurrentActivityExecutors:      numOrNot("TEMPORAL_WORKER_CAPACITY_MAX_CONCURRENT_ACTIVITY_EXECUTORS"),
-			MaxConcurrentLocalActivityExecutors: numOrNot("TEMPORAL_WORKER_CAPACITY_MAX_CONCURRENT_LOCAL_ACTIVITY_EXECUTORS"),
-			MaxConcurrentWorkflowTaskPollers:    numOrNot("TEMPORAL_WORKER_CAPACITY_MAX_CONCURRENT_WORKFLOW_TASK_POLLERS"),
-			MaxConcurrentActivityTaskPollers:    numOrNot("TEMPORAL_WORKER_CAPACITY_MAX_CONCURRENT_ACTIVITY_TASK_POLLERS"),
-			MaxCachedWorkflows:                  numOrNot("TEMPORAL_WORKER_CAPACITY_MAX_CACHED_WORKFLOWS"),
+	worker := &TemporalWorker{
+		Capacity: &TemporalWorkerCapacity{
+			MaxConcurrentWorkflowTaskExecutions: intOrNot("TEMPORAL_WORKER_CAPACITY_MAX_CONCURRENT_WORKFLOW_TASK_EXECUTORS"),
+			MaxConcurrentActivityExecutors:      intOrNot("TEMPORAL_WORKER_CAPACITY_MAX_CONCURRENT_ACTIVITY_EXECUTORS"),
+			MaxConcurrentLocalActivityExecutors: intOrNot("TEMPORAL_WORKER_CAPACITY_MAX_CONCURRENT_LOCAL_ACTIVITY_EXECUTORS"),
+			MaxConcurrentWorkflowTaskPollers:    intOrNot("TEMPORAL_WORKER_CAPACITY_MAX_CONCURRENT_WORKFLOW_TASK_POLLERS"),
+			MaxConcurrentActivityTaskPollers:    intOrNot("TEMPORAL_WORKER_CAPACITY_MAX_CONCURRENT_ACTIVITY_TASK_POLLERS"),
+			MaxCachedWorkflows:                  intOrNot("TEMPORAL_WORKER_CAPACITY_MAX_CACHED_WORKFLOWS"),
 		},
 		Name: "",
-		RateLimits: TemporalWorkerRateLimits{
-			MaxWorkerActivitiesPerSecond:    numOrNot("TEMPORAL_WORKER_RATE_LIMITS_MAX_WORKER_ACTIVITIES_PER_SECOND"),
-			MaxTaskQueueActivitiesPerSecond: numOrNot("TEMPORAL_WORKER_RATE_LIMITS_MAX_TASK_QUEUE_ACTIVITIES_PER_SECOND"),
+		RateLimits: &TemporalWorkerRateLimits{
+			MaxWorkerActivitiesPerSecond:    intOrNot("TEMPORAL_WORKER_RATE_LIMITS_MAX_WORKER_ACTIVITIES_PER_SECOND"),
+			MaxTaskQueueActivitiesPerSecond: intOrNot("TEMPORAL_WORKER_RATE_LIMITS_MAX_TASK_QUEUE_ACTIVITIES_PER_SECOND"),
 		},
-		TaskQueue:  assertCfg("TEMPORAL_WORKER_TASK_QUEUE"),
-		BundlePath: assertCfg("TEMPORAL_WORKER_BUNDLE_PATH"),
+		TaskQueue: assertCfg("TEMPORAL_WORKER_TASK_QUEUE"),
+		Tuner: &TemporalWorkerTuner{
+			TargetCPU: floatOrNot("TEMPORAL_WORKER_TUNER_TARGET_CPU"),
+			TargetMem: floatOrNot("TEMPORAL_WORKER_TUNER_TARGET_MEM"),
+		},
 	}
 
-	connection := TemporalConnection{
+	connection := &TemporalConnection{
 		Namespace: assertCfg("TEMPORAL_CONNECTION_NAMESPACE"),
 		Target:    assertCfg("TEMPORAL_CONNECTION_TARGET"),
 		MTLS:      mtls,
 	}
 
-	return TemporalConfig{
+	return &TemporalConfig{
 		Connection: connection,
 		Worker:     worker,
 	}, nil
 }
+func floatOrNot(key string) float64 {
+	if value := os.Getenv(key); value != "" {
+		num, _ := strconv.ParseFloat(value, 64)
+		return num
+	}
+	return 0
+}
 
-func numOrNot(key string) int {
+func intOrNot(key string) int {
 	if value := os.Getenv(key); value != "" {
 		num, _ := strconv.Atoi(value)
 		return num
