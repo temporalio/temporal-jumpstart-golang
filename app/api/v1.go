@@ -2,6 +2,7 @@ package api
 
 import (
 	"context"
+	"errors"
 	"github.com/temporalio/temporal-jumpstart-golang/app/api/encoding"
 	"github.com/temporalio/temporal-jumpstart-golang/app/api/messages"
 	"github.com/temporalio/temporal-jumpstart-golang/app/clients"
@@ -41,11 +42,18 @@ func CreateV1Router(ctx context.Context, deps *V1Dependencies, router *mux.Route
 			http.Error(w, "Internal Server Error", http.StatusInternalServerError)
 			return
 		}
-		if err := encoding.EncodeJSONResponseBody(w, result, http.StatusOK); err != nil {
+		var output *string
+		if err := result.Get(&output); err != nil {
 			http.Error(w, "Internal Server Error", http.StatusInternalServerError)
 			return
 		}
-	}).Methods("GET")
+		_, err = w.Write([]byte(*output))
+		if err != nil {
+			http.Error(w, "Internal Server Error", http.StatusInternalServerError)
+			return
+		}
+
+	}).Methods(http.MethodGet)
 
 	router.HandleFunc("/pings/{id}", func(w http.ResponseWriter, r *http.Request) {
 		var body *messages.PutPing
@@ -58,18 +66,20 @@ func CreateV1Router(ctx context.Context, deps *V1Dependencies, router *mux.Route
 		workflowId := vars["id"]
 
 		options := client.StartWorkflowOptions{
-			ID:                    workflowId,
-			TaskQueue:             deps.Config.Temporal.Worker.TaskQueue,
-			WorkflowIDReusePolicy: enums.WORKFLOW_ID_REUSE_POLICY_ALLOW_DUPLICATE_FAILED_ONLY,
+			ID:                       workflowId,
+			TaskQueue:                deps.Config.Temporal.Worker.TaskQueue,
+			WorkflowIDReusePolicy:    enums.WORKFLOW_ID_REUSE_POLICY_ALLOW_DUPLICATE_FAILED_ONLY,
+			WorkflowIDConflictPolicy: enums.WORKFLOW_ID_CONFLICT_POLICY_FAIL,
 		}
 
 		_, err := deps.Clients.Temporal.ExecuteWorkflow(r.Context(), options, workflows.Ping, body.Ping)
 		if err != nil {
-			// TODO more concise error handling
-			// if _, ok := err.(...); ok {
-			//	http.Error(w, "PingWorkflow '"+workflowId+"' has already been started.", http.StatusConflict)
-			//	return
-			//}
+			var alreadyStartedErr *serviceerror.WorkflowExecutionAlreadyStarted
+			if errors.As(err, &alreadyStartedErr) {
+				http.Error(w, "Workflow already exists", http.StatusConflict)
+				return
+			}
+
 			log.Printf("Failed to execute workflow '%s': %v", workflowId, err)
 			http.Error(w, "Internal Server Error", http.StatusInternalServerError)
 			return
@@ -77,7 +87,7 @@ func CreateV1Router(ctx context.Context, deps *V1Dependencies, router *mux.Route
 
 		w.Header().Set("Location", "./"+workflowId)
 		w.WriteHeader(http.StatusAccepted)
-	}).Methods("PUT")
+	}).Methods(http.MethodPut)
 
 	return router
 }
