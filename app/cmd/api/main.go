@@ -4,7 +4,7 @@ import (
 	"context"
 	"fmt"
 	"github.com/temporalio/temporal-jumpstart-golang/app/api"
-	"github.com/temporalio/temporal-jumpstart-golang/app/clients"
+	appclients "github.com/temporalio/temporal-jumpstart-golang/app/clients"
 	"github.com/temporalio/temporal-jumpstart-golang/app/config"
 	"log"
 	"net/http"
@@ -14,7 +14,7 @@ func main() {
 
 	ctx := context.Background()
 	cfg := config.MustNewConfig()
-	clients, err := clients.NewClients(ctx, cfg)
+	clients, err := appclients.NewClients(ctx, cfg)
 	if err != nil {
 		log.Fatal(err)
 	}
