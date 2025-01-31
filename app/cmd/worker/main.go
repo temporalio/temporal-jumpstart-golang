@@ -16,7 +16,7 @@ func main() {
 	if err != nil {
 		log.Fatalln(err)
 	}
-	w, err := temporalworker.NewWorker(cfg, clients)
+	w, err := temporalworker.NewAppsWorker(ctx, cfg, clients)
 	if err != nil {
 		log.Fatalln(err)
 	}

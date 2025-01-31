@@ -1,13 +1,15 @@
 package temporal
 
 import (
+	"context"
 	"github.com/temporalio/temporal-jumpstart-golang/app/clients"
 	"github.com/temporalio/temporal-jumpstart-golang/app/config"
+	"github.com/temporalio/temporal-jumpstart-golang/app/domain/workflows"
 	"go.temporal.io/sdk/contrib/resourcetuner"
 	"go.temporal.io/sdk/worker"
 )
 
-func NewWorker(cfg *config.Config, clients *clients.Clients) (worker.Worker, error) {
+func NewAppsWorker(ctx context.Context, cfg *config.Config, clients *clients.Clients) (worker.Worker, error) {
 	if cfg.Temporal.Worker.Capacity.MaxCachedWorkflows > 0 {
 		worker.SetStickyWorkflowCacheSize(cfg.Temporal.Worker.Capacity.MaxCachedWorkflows)
 	}
@@ -38,6 +40,14 @@ func NewWorker(cfg *config.Config, clients *clients.Clients) (worker.Worker, err
 	}
 
 	w := worker.New(clients.Temporal, cfg.Temporal.Worker.TaskQueue, opts)
-
+	registerComponents(ctx, cfg, clients, w)
 	return w, nil
+}
+
+func registerComponents(ctx context.Context,
+	cfg *config.Config,
+	clients *clients.Clients,
+	worker worker.Worker) error {
+	worker.RegisterWorkflow(workflows.Ping)
+	return nil
 }

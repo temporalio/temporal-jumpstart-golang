@@ -1,16 +1,19 @@
 package api
 
 import (
-	"encoding/json"
+	"context"
+	"github.com/temporalio/temporal-jumpstart-golang/app/api/encoding"
+	"github.com/temporalio/temporal-jumpstart-golang/app/api/messages"
 	"github.com/temporalio/temporal-jumpstart-golang/app/clients"
 	"github.com/temporalio/temporal-jumpstart-golang/app/config"
+	"github.com/temporalio/temporal-jumpstart-golang/app/domain/workflows"
+	"go.temporal.io/api/enums/v1"
 	"go.temporal.io/api/serviceerror"
+	"log"
 	"net/http"
 
 	"github.com/gorilla/mux"
 	"go.temporal.io/sdk/client"
-	"go.temporal.io/sdk/temporal"
-	"go.temporal.io/sdk/workflow"
 )
 
 type V1Dependencies struct {
@@ -18,20 +21,18 @@ type V1Dependencies struct {
 	Config  *config.Config
 }
 
-type PutPing struct {
-	Ping string `json:"ping"`
-}
-
-func CreateRouter(deps V1Dependencies) *mux.Router {
-	router := mux.NewRouter()
+func CreateV1Router(ctx context.Context, deps *V1Dependencies, router *mux.Router) *mux.Router {
 
 	router.HandleFunc("/pings/{id}", func(w http.ResponseWriter, r *http.Request) {
+
 		vars := mux.Vars(r)
 		workflowId := vars["id"]
 
-		handle := deps.Clients.Temporal.GetWorkflow(r.Context(), workflowId, "")
-		var result string
-		err := handle.Get(r.Context(), &result)
+		result, err := deps.Clients.Temporal.QueryWorkflow(
+			r.Context(),
+			workflowId,
+			"",
+			workflows.QueryPing)
 		if err != nil {
 			if _, ok := err.(*serviceerror.NotFound); ok {
 				http.Error(w, "Workflow not found", http.StatusNotFound)
@@ -40,40 +41,42 @@ func CreateRouter(deps V1Dependencies) *mux.Router {
 			http.Error(w, "Internal Server Error", http.StatusInternalServerError)
 			return
 		}
-		w.WriteHeader(http.StatusOK)
-		w.Write([]byte(result))
+		if err := encoding.EncodeJSONResponseBody(w, result, http.StatusOK); err != nil {
+			http.Error(w, "Internal Server Error", http.StatusInternalServerError)
+			return
+		}
 	}).Methods("GET")
 
 	router.HandleFunc("/pings/{id}", func(w http.ResponseWriter, r *http.Request) {
-		vars := mux.Vars(r)
-		workflowId := vars["id"]
-
-		var putPing PutPing
-		err := json.NewDecoder(r.Body).Decode(&putPing)
-		if err != nil || putPing.Ping == "" {
-			http.Error(w, "'ping' body attribute is a required input", http.StatusBadRequest)
+		var body *messages.PutPing
+		if err := encoding.DecodeJSONBody(w, r, &body); err != nil {
+			http.Error(w, err.Error(), http.StatusBadRequest)
 			return
 		}
+
+		vars := mux.Vars(r)
+		workflowId := vars["id"]
 
 		options := client.StartWorkflowOptions{
 			ID:                    workflowId,
 			TaskQueue:             deps.Config.Temporal.Worker.TaskQueue,
-			WorkflowIDReusePolicy: client.WorkflowIDReusePolicyAllowDuplicateFailedOnly,
+			WorkflowIDReusePolicy: enums.WORKFLOW_ID_REUSE_POLICY_ALLOW_DUPLICATE_FAILED_ONLY,
 		}
 
-		we, err := deps.Clients.Temporal.ExecuteWorkflow(r.Context(), options, pingWorkflow, putPing.Ping)
+		_, err := deps.Clients.Temporal.ExecuteWorkflow(r.Context(), options, workflows.Ping, body.Ping)
 		if err != nil {
-			if _, ok := err.(*temporal.WorkflowExecutionAlreadyStartedError); ok {
-				http.Error(w, "PingWorkflow '"+workflowId+"' has already been started.", http.StatusConflict)
-				return
-			}
+			// TODO more concise error handling
+			// if _, ok := err.(...); ok {
+			//	http.Error(w, "PingWorkflow '"+workflowId+"' has already been started.", http.StatusConflict)
+			//	return
+			//}
+			log.Printf("Failed to execute workflow '%s': %v", workflowId, err)
 			http.Error(w, "Internal Server Error", http.StatusInternalServerError)
 			return
 		}
 
 		w.Header().Set("Location", "./"+workflowId)
 		w.WriteHeader(http.StatusAccepted)
-		json.NewEncoder(w).Encode(we.GetID())
 	}).Methods("PUT")
 
 	return router
