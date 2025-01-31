@@ -22,7 +22,7 @@ type V1Dependencies struct {
 	Config  *config.Config
 }
 
-func CreateV1Router(ctx context.Context, deps *V1Dependencies, router *mux.Router) *mux.Router {
+func createV1Router(ctx context.Context, deps *V1Dependencies, router *mux.Router) *mux.Router {
 
 	router.HandleFunc("/pings/{id}", func(w http.ResponseWriter, r *http.Request) {
 
