@@ -3,6 +3,7 @@ package config
 import (
 	"errors"
 	"fmt"
+	"net/url"
 	"os"
 	"strconv"
 	"strings"
@@ -108,7 +109,10 @@ func createApiCfg() (*APIConfig, error) {
 	if apiUrl == "" {
 		apiUrl = "https://localhost:4000/api"
 	}
-
+	parsedUrl, err := url.Parse(apiUrl)
+	if err != nil {
+		return nil, err
+	}
 	mtls := &MTLSConfig{
 		CertChainFile:               os.Getenv("API_CONNECTION_MTLS_CERT_CHAIN_FILE"),
 		KeyFile:                     os.Getenv("API_CONNECTION_MTLS_KEY_FILE"),
@@ -124,9 +128,9 @@ func createApiCfg() (*APIConfig, error) {
 	}
 
 	return &APIConfig{
-		Port: apiUrl,
+		Port: parsedUrl.Port(),
 		MTLS: mtls,
-		URL:  apiUrl,
+		URL:  parsedUrl.String(),
 	}, nil
 }
 

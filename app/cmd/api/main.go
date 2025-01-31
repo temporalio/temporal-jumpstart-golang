@@ -32,6 +32,6 @@ func main() {
 		Clients: clients,
 		Config:  cfg,
 	}, v1Router)
-	log.Fatal(http.ListenAndServe(fmt.Sprintf(":%d", cfg.API.Port),
+	log.Fatal(http.ListenAndServe(fmt.Sprintf(":%s", cfg.API.Port),
 		handlers.CORS(creds, ttl, headers, methods, origins)(router)))
 }
