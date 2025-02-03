@@ -3,6 +3,7 @@ package api
 import (
 	"context"
 	"errors"
+	"fmt"
 	"github.com/temporalio/temporal-jumpstart-golang/app/api/encoding"
 	"github.com/temporalio/temporal-jumpstart-golang/app/api/messages"
 	"github.com/temporalio/temporal-jumpstart-golang/app/clients"
@@ -12,6 +13,7 @@ import (
 	"go.temporal.io/api/serviceerror"
 	"log"
 	"net/http"
+	"net/url"
 
 	"github.com/gorilla/mux"
 	"go.temporal.io/sdk/client"
@@ -42,12 +44,13 @@ func createV1Router(ctx context.Context, deps *V1Dependencies, router *mux.Route
 			http.Error(w, "Internal Server Error", http.StatusInternalServerError)
 			return
 		}
-		var output *string
+		var output string
 		if err := result.Get(&output); err != nil {
+			log.Printf("Error getting workflow output: %v", err)
 			http.Error(w, "Internal Server Error", http.StatusInternalServerError)
 			return
 		}
-		_, err = w.Write([]byte(*output))
+		_, err = w.Write([]byte(output))
 		if err != nil {
 			http.Error(w, "Internal Server Error", http.StatusInternalServerError)
 			return
@@ -72,7 +75,7 @@ func createV1Router(ctx context.Context, deps *V1Dependencies, router *mux.Route
 			WorkflowIDConflictPolicy: enums.WORKFLOW_ID_CONFLICT_POLICY_FAIL,
 		}
 
-		_, err := deps.Clients.Temporal.ExecuteWorkflow(r.Context(), options, workflows.Ping, body.Ping)
+		wfRun, err := deps.Clients.Temporal.ExecuteWorkflow(r.Context(), options, workflows.Ping, body.Ping)
 		if err != nil {
 			var alreadyStartedErr *serviceerror.WorkflowExecutionAlreadyStarted
 			if errors.As(err, &alreadyStartedErr) {
@@ -80,12 +83,24 @@ func createV1Router(ctx context.Context, deps *V1Dependencies, router *mux.Route
 				return
 			}
 
-			log.Printf("Failed to execute workflow '%s': %v", workflowId, err)
+			log.Printf("Failed to execute workflow '%s': %v", wfRun.GetID(), err)
 			http.Error(w, "Internal Server Error", http.StatusInternalServerError)
 			return
 		}
+		host := r.Header.Get("Host")
+		if host == "" {
+			host = r.Host
+		}
+		host = fmt.Sprintf("https://%s", host)
+		fmt.Println(host)
+		link, err := url.Parse(host)
+		if err != nil {
+			http.Error(w, "Internal Server Error", http.StatusInternalServerError)
+			return
+		}
+		location := link.ResolveReference(r.URL)
 
-		w.Header().Set("Location", "./"+workflowId)
+		w.Header().Set("Location", location.String())
 		w.WriteHeader(http.StatusAccepted)
 	}).Methods(http.MethodPut)
 

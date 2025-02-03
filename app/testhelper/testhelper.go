@@ -2,6 +2,7 @@ package testhelper
 
 import (
 	"context"
+	"fmt"
 	"github.com/google/uuid"
 	"go.temporal.io/api/enums/v1"
 	"go.temporal.io/api/history/v1"
@@ -37,6 +38,7 @@ func GetFunctionName(i interface{}) (name string, isMethod bool) {
 	return strings.TrimSuffix(shortName, "-fm"), isMethod
 }
 
+// GetWorkflowHistory is a utility for fetching all history events out of a workflow execution
 func GetWorkflowHistory(ctx context.Context,
 	client client.Client,
 	workflowID string) (*history.History, error) {
@@ -52,4 +54,25 @@ func GetWorkflowHistory(ctx context.Context,
 		result.Events = append(result.Events, event)
 	}
 	return result, nil
+}
+
+// TestEncodedValue simplifies testing with this result from the Temporal Client
+type TestEncodedValue struct {
+	Value interface{}
+}
+
+func (val *TestEncodedValue) HasValue() bool {
+	return val.Value != nil
+}
+
+func (val *TestEncodedValue) Get(valuePtr interface{}) error {
+	if !val.HasValue() {
+		return fmt.Errorf("no value present")
+	}
+	if reflect.TypeOf(valuePtr) != reflect.TypeOf(val.Value) {
+		return fmt.Errorf("wrong type of value. received %T but got %T", valuePtr, val.Value)
+	}
+	result := reflect.ValueOf(val.Value).Elem()
+	reflect.ValueOf(valuePtr).Elem().Set(result)
+	return nil
 }

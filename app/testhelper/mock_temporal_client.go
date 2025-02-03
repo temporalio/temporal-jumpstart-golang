@@ -113,8 +113,11 @@ func (m *MockTemporalClient) GetSearchAttributes(ctx context.Context) (*workflow
 }
 
 func (m *MockTemporalClient) QueryWorkflow(ctx context.Context, workflowID string, runID string, queryType string, args ...interface{}) (converter.EncodedValue, error) {
-	//TODO implement me
-	panic("implement me")
+	a := m.Called(ctx, workflowID, runID, queryType, args)
+	if a.Get(0) == nil {
+		return nil, a.Error(1)
+	}
+	return a.Get(0).(converter.EncodedValue), a.Error(1)
 }
 
 func (m *MockTemporalClient) QueryWorkflowWithOptions(ctx context.Context, request *client.QueryWorkflowWithOptionsRequest) (*client.QueryWorkflowWithOptionsResponse, error) {
