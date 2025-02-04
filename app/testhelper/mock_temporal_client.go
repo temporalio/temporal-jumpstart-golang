@@ -10,6 +10,7 @@ import (
 	"go.temporal.io/sdk/converter"
 )
 
+// MockTemporalClient captures calls for the `client.Client`. Implement these operations as needed.
 type MockTemporalClient struct {
 	mock.Mock
 }
