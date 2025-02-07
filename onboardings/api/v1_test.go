@@ -11,7 +11,6 @@ import (
 	"github.com/temporalio/temporal-jumpstart-golang/onboardings/api/encoding"
 	"github.com/temporalio/temporal-jumpstart-golang/onboardings/clients"
 	"github.com/temporalio/temporal-jumpstart-golang/onboardings/config"
-	"github.com/temporalio/temporal-jumpstart-golang/onboardings/domain/workflows"
 	"github.com/temporalio/temporal-jumpstart-golang/onboardings/domain/workflows/onboardings"
 	apiv1 "github.com/temporalio/temporal-jumpstart-golang/onboardings/generated/api/v1"
 	domainv1 "github.com/temporalio/temporal-jumpstart-golang/onboardings/generated/domain/v1"
@@ -168,11 +167,7 @@ func TestV1GetOnboardingState(t *testing.T) {
 			Comment: "",
 		},
 	}
-	var expect *apiv1.OnboardingsGet = &apiv1.OnboardingsGet{
-		Id:           workflowId,
-		CurrentValue: state.SentRequest.GetValue(),
-		Approval:     state.Approval,
-	}
+
 	queryResult := &testhelper.TestEncodedValue{Value: &state}
 
 	temporalClient := &testhelper.MockTemporalClient{}
@@ -201,13 +196,18 @@ func TestV1GetOnboardingState(t *testing.T) {
 	actual := &apiv1.OnboardingsGet{}
 	A.NoError(encoding.DecodeJSONResponse(resp, &actual))
 	A.NoError(err)
+	var expect *apiv1.OnboardingsGet = &apiv1.OnboardingsGet{
+		Id:           workflowId,
+		CurrentValue: state.SentRequest.GetValue(),
+		Approval:     state.Approval,
+	}
 	A.Equal(expect.CurrentValue, actual.CurrentValue)
 	A.Equal(expect.Approval.Status, actual.Approval.Status)
 	A.Equal(expect.Approval.Comment, actual.Approval.Comment)
 }
 
 // behavior test
-func TestV1GetGivenExistingPingFetchesCurrentStateOfPing(t *testing.T) {
+func TestV1GetGivenExistingOnboardingFetchesCurrentState(t *testing.T) {
 	A := assert.New(t)
 	ctx := context.Background()
 	workflowId := testhelper.RandomString()
@@ -216,16 +216,32 @@ func TestV1GetGivenExistingPingFetchesCurrentStateOfPing(t *testing.T) {
 			Worker: &config.TemporalWorker{TaskQueue: testhelper.RandomString()},
 		},
 	}
-	var expect string = "pong: bar"
-	queryResult := &testhelper.TestEncodedValue{Value: &expect}
+	state := &domainv1.EntityOnboardingStateResponse{
+		Id:     workflowId,
+		Status: enums.WORKFLOW_EXECUTION_STATUS_RUNNING.String(),
+		SentRequest: &domainv1.OnboardEntityRequest{
+			Id:                       workflowId,
+			Value:                    testhelper.RandomString(),
+			CompletionTimeoutSeconds: 0,
+			DeputyOwnerEmail:         "",
+			SkipApproval:             false,
+		},
+		Approval: &domainv1.Approval{
+			Status:  domainv1.ApprovalStatus_PENDING,
+			Comment: "",
+		},
+	}
+
+	queryResult := &testhelper.TestEncodedValue{Value: &state}
 
 	temporalClient := &testhelper.MockTemporalClient{}
 	temporalClient.On("QueryWorkflow",
 		mock.Anything,
-		workflowId,
 		mock.Anything,
-		workflows.QueryPing,
-		mock.Anything).Once().Return(queryResult, nil)
+		mock.Anything,
+		onboardings.QueryEntityOnboardingState,
+		mock.Anything).Return(queryResult, nil)
+
 	c := &clients.Clients{Temporal: temporalClient}
 	sut := createV1Router(ctx, &V1Dependencies{
 		Clients: c,
@@ -233,7 +249,7 @@ func TestV1GetGivenExistingPingFetchesCurrentStateOfPing(t *testing.T) {
 	}, mux.NewRouter())
 	testserver := httptest.NewServer(sut)
 	defer testserver.Close()
-	parsedUrl, err := url.Parse(testserver.URL + "/pings/" + workflowId)
+	parsedUrl, err := url.Parse(testserver.URL + "/onboardings/" + workflowId)
 	A.NoError(err)
 	req, err := http.NewRequest("GET", parsedUrl.String(), nil)
 	A.NoError(err)
@@ -245,7 +261,7 @@ func TestV1GetGivenExistingPingFetchesCurrentStateOfPing(t *testing.T) {
 }
 
 // state
-func TestV1GetGivenNonExistingPingReturns404(t *testing.T) {
+func TestV1GetGivenNonExistingOnboardingReturns404(t *testing.T) {
 	A := assert.New(t)
 	ctx := context.Background()
 	workflowId := testhelper.RandomString()
@@ -260,7 +276,7 @@ func TestV1GetGivenNonExistingPingReturns404(t *testing.T) {
 		mock.Anything,
 		workflowId,
 		mock.Anything,
-		workflows.QueryPing,
+		onboardings.QueryEntityOnboardingState,
 		mock.Anything).Once().Return(nil, serviceerror.NewNotFound("workflow not found"))
 	c := &clients.Clients{Temporal: temporalClient}
 	sut := createV1Router(ctx, &V1Dependencies{
@@ -269,7 +285,7 @@ func TestV1GetGivenNonExistingPingReturns404(t *testing.T) {
 	}, mux.NewRouter())
 	testserver := httptest.NewServer(sut)
 	defer testserver.Close()
-	parsedUrl, err := url.Parse(testserver.URL + "/pings/" + workflowId)
+	parsedUrl, err := url.Parse(testserver.URL + "/onboardings/" + workflowId)
 	A.NoError(err)
 	req, err := http.NewRequest("GET", parsedUrl.String(), nil)
 	A.NoError(err)
