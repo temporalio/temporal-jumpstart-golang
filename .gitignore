@@ -23,3 +23,27 @@ go.work.sum
 
 # env file
 .env
+
+# dependencies
+node_modules
+/node_modules
+/.pnp
+.pnp.js
+
+# testing
+/coverage
+
+# next.js
+/.next/
+/out/
+
+# production
+/build
+
+# misc
+.DS_Store
+*.pem
+
+generated
+
+.idea
