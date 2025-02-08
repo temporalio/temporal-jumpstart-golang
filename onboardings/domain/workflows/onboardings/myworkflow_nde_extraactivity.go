@@ -9,7 +9,7 @@ import (
 
 func (workflows *Workflows) MyWorkflowV1(ctx workflow.Context, args *workflows.StartMyWorkflowRequest) error {
 	// activity being added without GetVersion
-	workflow.ExecuteActivity(ctx, MyWorkflowActivities.MutateActivity, &commands.MutateActivityRequest{})
+	workflow.ExecuteActivity(ctx, OnboardEntityActivities.SendEmail, &commands.MutateActivityRequest{})
 	workflow.Sleep(ctx, time.Second)
 	return nil
 }

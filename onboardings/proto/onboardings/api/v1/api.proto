@@ -5,6 +5,7 @@ package proto.onboardings.api.v1;
 
 message OnboardingsPut {
   string value = 1;
+  proto.onboardings.domain.v1.values.Approval approval = 2;
 }
 message OnboardingsGet {
   string id = 1;
