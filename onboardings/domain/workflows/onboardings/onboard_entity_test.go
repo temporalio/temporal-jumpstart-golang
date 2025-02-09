@@ -95,3 +95,9 @@ func (s *OnboardEntityTestSuite) Test_GivenApprovedNoDeputy_ShouldPerformOnboard
 
 	s.env.AssertExpectations(s.T())
 }
+func (s *OnboardEntityTestSuite) Test_GivenDeputy_ShouldRequestDeputyApprovalUponTimeout() {
+
+}
+func (s *OnboardEntityTestSuite) Test_GivenRejection_ShouldNotPerformOnboardingTasks() {
+
+}
