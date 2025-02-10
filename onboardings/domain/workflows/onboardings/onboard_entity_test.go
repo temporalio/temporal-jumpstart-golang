@@ -8,6 +8,7 @@ import (
 	"github.com/temporalio/temporal-jumpstart-golang/onboardings/domain/workflows"
 	v1 "github.com/temporalio/temporal-jumpstart-golang/onboardings/generated/domain/v1"
 	"go.temporal.io/sdk/converter"
+	"go.temporal.io/sdk/temporal"
 	"go.temporal.io/sdk/testsuite"
 	"go.temporal.io/sdk/workflow"
 	"testing"
@@ -49,7 +50,58 @@ func TestMyWorkflow(t *testing.T) {
 }
 
 /* ============= TESTS =================== */
-// behavior
+// [state]
+// This demonstrates using golang table tests to perform validation
+// but notice that we  disregard the underlying TestSuite environment to get complete isolation.
+// This is not completely necessary but here for demonstration.
+func (s *OnboardEntityTestSuite) Test_GivenInvalidArgs_ShouldFailTheWorkflow() {
+
+	type test struct {
+		args *v1.OnboardEntityRequest
+		name string
+	}
+	cases := []test{
+		{
+			name: "missing id",
+			args: &v1.OnboardEntityRequest{
+				Id:                       "",
+				Value:                    testhelper.RandomString(),
+				CompletionTimeoutSeconds: 0,
+				DeputyOwnerEmail:         "",
+				SkipApproval:             false,
+			},
+		},
+		{
+			name: "missing value",
+			args: &v1.OnboardEntityRequest{
+				Id:                       testhelper.RandomString(),
+				Value:                    "",
+				CompletionTimeoutSeconds: 0,
+				DeputyOwnerEmail:         "",
+				SkipApproval:             false,
+			},
+		},
+	}
+	for _, tc := range cases {
+		s.Run(tc.name, func() {
+			// disregard the suite test environment for these
+			caseEnv := s.NewTestWorkflowEnvironment()
+			caseEnv.RegisterWorkflow(TypeWorkflows.OnboardEntity)
+			caseEnv.OnActivity(OnboardEntityActivities.RegisterCrmEntity, mock.Anything, mock.Anything).Never()
+			caseEnv.OnActivity(OnboardEntityActivities.SendEmail, mock.Anything, mock.Anything).Never()
+			caseEnv.ExecuteWorkflow(TypeWorkflows.OnboardEntity, tc.args)
+			s.True(caseEnv.IsWorkflowCompleted())
+			werr := caseEnv.GetWorkflowError()
+			s.NotNil(werr)
+			var appErr *temporal.ApplicationError
+			errors.As(werr, &appErr)
+			s.Equal(v1.Errors_ERR_ONBOARD_ENTITY_INVALID_ARGS.String(), appErr.Type())
+		})
+	}
+
+}
+
+// [behavior]
 func (s *OnboardEntityTestSuite) Test_GivenNeverApproved_DoesNotPerformOnboardingTasks() {
 	s.env.RegisterWorkflow(TypeWorkflows.OnboardEntity)
 	args := &v1.OnboardEntityRequest{
@@ -69,7 +121,7 @@ func (s *OnboardEntityTestSuite) Test_GivenNeverApproved_DoesNotPerformOnboardin
 	s.env.AssertExpectations(s.T())
 }
 
-// behavior
+// [behavior]
 func (s *OnboardEntityTestSuite) Test_GivenApprovedNoDeputy_ShouldPerformOnboardingTasks() {
 	s.env.RegisterWorkflow(TypeWorkflows.OnboardEntity)
 	args := &v1.OnboardEntityRequest{
@@ -99,7 +151,7 @@ func (s *OnboardEntityTestSuite) Test_GivenApprovedNoDeputy_ShouldPerformOnboard
 	s.env.AssertExpectations(s.T())
 }
 
-// state: ContinueAsNew Test
+// [state]: ContinueAsNew Test
 func (s *OnboardEntityTestSuite) Test_GivenDeputyWithNoApprovalReceived_ShouldContinueAsNewWithNewArgs() {
 	s.env.RegisterWorkflow(TypeWorkflows.OnboardEntity)
 	args := &v1.OnboardEntityRequest{
@@ -130,7 +182,7 @@ func (s *OnboardEntityTestSuite) Test_GivenDeputyWithNoApprovalReceived_ShouldCo
 	s.Equal(false, canParams.SkipApproval)
 }
 
-// behavior: ContinueAsNew Test
+// [behavior]: ContinueAsNew Test
 func (s *OnboardEntityTestSuite) Test_GivenDeputyWithNoApprovalReceived_ShouldRequestDeputyApproval() {
 	s.env.RegisterWorkflow(TypeWorkflows.OnboardEntity)
 	args := &v1.OnboardEntityRequest{
@@ -148,14 +200,6 @@ func (s *OnboardEntityTestSuite) Test_GivenDeputyWithNoApprovalReceived_ShouldRe
 
 	s.env.ExecuteWorkflow(TypeWorkflows.OnboardEntity, args)
 	s.True(s.env.IsWorkflowCompleted())
-
-	//expectCompletionTimeoutSeconds := calculateWaitSeconds(&v1.OnboardEntityRequest{
-	//	Id:                       args.Id,
-	//	Value:                    args.Value,
-	//	CompletionTimeoutSeconds: args.CompletionTimeoutSeconds,
-	//	DeputyOwnerEmail:         "",
-	//	SkipApproval:             false,
-	//})
 
 	s.env.AssertExpectations(s.T())
 }

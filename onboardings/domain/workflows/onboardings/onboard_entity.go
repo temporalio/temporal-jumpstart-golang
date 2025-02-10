@@ -22,6 +22,14 @@ type OnboardEntityActivities interface {
 	SendEmail(ctx context.Context, cmd *v1.RequestDeputyOwnerRequest) error
 }
 
+func assertValidArgs(args *v1.OnboardEntityRequest) error {
+	if strings.TrimSpace(args.Id) != "" &&
+		strings.TrimSpace(args.Value) != "" {
+		return nil
+	}
+	return temporal.NewApplicationError(v1.Errors_ERR_ONBOARD_ENTITY_INVALID_ARGS.String(), v1.Errors_ERR_ONBOARD_ENTITY_INVALID_ARGS.String())
+}
+
 func calculateWaitSeconds(args *v1.OnboardEntityRequest) uint64 {
 	if args.SkipApproval {
 		return 0
@@ -39,7 +47,9 @@ func calculateWaitSeconds(args *v1.OnboardEntityRequest) uint64 {
 }
 
 func (workflows *Workflows) OnboardEntity(ctx workflow.Context, args *v1.OnboardEntityRequest) error {
-
+	if err := assertValidArgs(args); err != nil {
+		return err
+	}
 	state := &v1.EntityOnboardingStateResponse{
 		Id:          args.Id,
 		Status:      "",
