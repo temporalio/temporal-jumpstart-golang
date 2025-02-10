@@ -1,0 +1,18 @@
+# Learn more: https://buf.build/docs/configuration/v2/buf-gen-yaml
+version: v2
+inputs:
+  - directory: proto
+clean: true
+managed:
+  enabled: true
+  override:
+    - file_option: go_package_prefix
+      value: github.com/temporalio/temporal-jumpstart-golang/archive/generated
+
+plugins:
+  - remote: buf.build/protocolbuffers/go
+    out: generated
+    opt:
+      - paths=source_relative
+   #      - paths=source_relative
+#      - go_package_prefix=github.com/temporalio/temporal-jumpstart-golang/onboardings/generated

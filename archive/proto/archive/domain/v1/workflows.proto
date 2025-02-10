@@ -1,0 +1,11 @@
+syntax = "proto3";
+
+package proto.onboardings.domain.v1.workflows;
+
+enum Errors {
+  ERR_ONBOARD_ENTITY_TIMED_OUT = 0;
+}
+message StartArchiveRequest {
+  string id = 1;
+  int64 completionTimeoutSeconds = 2;
+}

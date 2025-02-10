@@ -1,0 +1,13 @@
+version: v2
+
+lint:
+  use:
+    - STANDARD
+modules:
+  - path: proto/archive
+#  - path: proto/onboardings/domain
+#      use:
+#        - STANDARD
+#    breaking:
+#      use:
+#        - FILE

@@ -1,0 +1,14 @@
+syntax = "proto3";
+
+package proto.onboardings.domain.v1.values;
+
+enum ApprovalStatus {
+  PENDING = 0;
+  REJECTED = 1;
+  APPROVED = 2;
+}
+
+message Approval {
+  proto.onboardings.domain.v1.values.ApprovalStatus status = 1;
+  string comment = 2;
+}

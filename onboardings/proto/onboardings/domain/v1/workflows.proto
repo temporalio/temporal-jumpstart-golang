@@ -1,0 +1,14 @@
+syntax = "proto3";
+
+package proto.onboardings.domain.v1.workflows;
+
+enum Errors {
+  ERR_ONBOARD_ENTITY_TIMED_OUT = 0;
+}
+message OnboardEntityRequest {
+  string id = 1;
+  string value = 2;
+  int64 completionTimeoutSeconds = 3;
+  string deputyOwnerEmail = 4;
+  bool skipApproval = 5;
+}

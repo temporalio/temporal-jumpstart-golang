@@ -1,0 +1,203 @@
+package api
+
+import (
+	"context"
+	"errors"
+	"fmt"
+	"github.com/temporalio/temporal-jumpstart-golang/onboardings/api/encoding"
+	"github.com/temporalio/temporal-jumpstart-golang/onboardings/api/messages"
+	"github.com/temporalio/temporal-jumpstart-golang/onboardings/clients"
+	"github.com/temporalio/temporal-jumpstart-golang/onboardings/config"
+	"github.com/temporalio/temporal-jumpstart-golang/onboardings/domain/workflows"
+	"github.com/temporalio/temporal-jumpstart-golang/onboardings/domain/workflows/onboardings"
+	apiv1 "github.com/temporalio/temporal-jumpstart-golang/onboardings/generated/api/v1"
+	domainv1 "github.com/temporalio/temporal-jumpstart-golang/onboardings/generated/domain/v1"
+	"go.temporal.io/api/enums/v1"
+	"go.temporal.io/api/serviceerror"
+	"log"
+	"net/http"
+	"net/url"
+
+	"github.com/gorilla/mux"
+	"go.temporal.io/sdk/client"
+)
+
+type V1Dependencies struct {
+	Clients *clients.Clients
+	Config  *config.Config
+}
+
+func createV1Router(ctx context.Context, deps *V1Dependencies, router *mux.Router) *mux.Router {
+
+	router.HandleFunc("/pings/{id}", func(w http.ResponseWriter, r *http.Request) {
+
+		vars := mux.Vars(r)
+		workflowId := vars["id"]
+
+		result, err := deps.Clients.Temporal.QueryWorkflow(
+			r.Context(),
+			workflowId,
+			"",
+			workflows.QueryPing)
+		if err != nil {
+			if _, ok := err.(*serviceerror.NotFound); ok {
+				http.Error(w, "Workflow not found", http.StatusNotFound)
+				return
+			}
+			http.Error(w, "Internal Server Error", http.StatusInternalServerError)
+			return
+		}
+		var output string
+		if err := result.Get(&output); err != nil {
+			log.Printf("Error getting workflow output: %v", err)
+			http.Error(w, "Internal Server Error", http.StatusInternalServerError)
+			return
+		}
+		_, err = w.Write([]byte(output))
+		if err != nil {
+			http.Error(w, "Internal Server Error", http.StatusInternalServerError)
+			return
+		}
+
+	}).Methods(http.MethodGet)
+
+	router.HandleFunc("/pings/{id}", func(w http.ResponseWriter, r *http.Request) {
+		var body *messages.PutPing
+		if err := encoding.DecodeJSONBody(w, r, &body); err != nil {
+			http.Error(w, err.Error(), http.StatusBadRequest)
+			return
+		}
+
+		vars := mux.Vars(r)
+		workflowId := vars["id"]
+
+		options := client.StartWorkflowOptions{
+			ID:                       workflowId,
+			TaskQueue:                deps.Config.Temporal.Worker.TaskQueue,
+			WorkflowIDReusePolicy:    enums.WORKFLOW_ID_REUSE_POLICY_ALLOW_DUPLICATE_FAILED_ONLY,
+			WorkflowIDConflictPolicy: enums.WORKFLOW_ID_CONFLICT_POLICY_FAIL,
+		}
+
+		wfRun, err := deps.Clients.Temporal.ExecuteWorkflow(r.Context(), options, workflows.Ping, body.Ping)
+		if err != nil {
+			var alreadyStartedErr *serviceerror.WorkflowExecutionAlreadyStarted
+			if errors.As(err, &alreadyStartedErr) {
+				http.Error(w, "Workflow already exists", http.StatusConflict)
+				return
+			}
+
+			log.Printf("Failed to execute workflow '%s': %v", wfRun.GetID(), err)
+			http.Error(w, "Internal Server Error", http.StatusInternalServerError)
+			return
+		}
+		host := r.Header.Get("Host")
+		if host == "" {
+			host = r.Host
+		}
+		host = fmt.Sprintf("https://%s", host)
+		fmt.Println(host)
+		link, err := url.Parse(host)
+		if err != nil {
+			http.Error(w, "Internal Server Error", http.StatusInternalServerError)
+			return
+		}
+		location := link.ResolveReference(r.URL)
+
+		w.Header().Set("Location", location.String())
+		w.WriteHeader(http.StatusAccepted)
+	}).Methods(http.MethodPut)
+
+	router.HandleFunc("/onboardings/{id}", func(w http.ResponseWriter, r *http.Request) {
+
+		vars := mux.Vars(r)
+		workflowId := vars["id"]
+
+		result, err := deps.Clients.Temporal.QueryWorkflow(
+			r.Context(),
+			workflowId,
+			"",
+			onboardings.QueryEntityOnboardingState)
+		if err != nil {
+			if _, ok := err.(*serviceerror.NotFound); ok {
+				http.Error(w, "Workflow not found", http.StatusNotFound)
+				return
+			}
+			http.Error(w, "Internal Server Error", http.StatusInternalServerError)
+			return
+		}
+		var queryResult *domainv1.EntityOnboardingStateResponse
+		if err := result.Get(&queryResult); err != nil {
+			log.Printf("Error getting workflow queryResult: %v", err)
+			http.Error(w, "Internal Server Error", http.StatusInternalServerError)
+			return
+		}
+		var output = &apiv1.OnboardingsGet{
+			Id:           queryResult.Id,
+			CurrentValue: queryResult.SentRequest.Value,
+			Approval:     queryResult.Approval,
+		}
+		err = encoding.EncodeJSONResponseBody(w, output, http.StatusOK)
+		if err != nil {
+			http.Error(w, "Internal Server Error", http.StatusInternalServerError)
+			return
+		}
+
+	}).Methods(http.MethodGet)
+
+	router.HandleFunc("/onboardings/{id}", func(w http.ResponseWriter, r *http.Request) {
+		var body *apiv1.OnboardingsPut
+		if err := encoding.DecodeJSONBody(w, r, &body); err != nil {
+			http.Error(w, err.Error(), http.StatusBadRequest)
+			return
+		}
+
+		vars := mux.Vars(r)
+		workflowId := vars["id"]
+
+		options := client.StartWorkflowOptions{
+			ID:                                       workflowId,
+			TaskQueue:                                deps.Config.Temporal.Worker.TaskQueue,
+			WorkflowIDReusePolicy:                    enums.WORKFLOW_ID_REUSE_POLICY_ALLOW_DUPLICATE_FAILED_ONLY,
+			WorkflowIDConflictPolicy:                 enums.WORKFLOW_ID_CONFLICT_POLICY_FAIL,
+			WorkflowExecutionErrorWhenAlreadyStarted: true,
+		}
+
+		params := &domainv1.OnboardEntityRequest{
+			Id:                       workflowId,
+			Value:                    body.Value,
+			CompletionTimeoutSeconds: 0,
+			DeputyOwnerEmail:         "",
+			SkipApproval:             false,
+		}
+
+		wfRun, err := deps.Clients.Temporal.ExecuteWorkflow(r.Context(), options, onboardings.TypeWorkflows.OnboardEntity, params)
+		if err != nil {
+			var alreadyStartedErr *serviceerror.WorkflowExecutionAlreadyStarted
+			if errors.As(err, &alreadyStartedErr) {
+				http.Error(w, "Workflow already exists", http.StatusConflict)
+				return
+			}
+
+			log.Printf("Failed to execute workflow '%s': %v", wfRun.GetID(), err)
+			http.Error(w, "Internal Server Error", http.StatusInternalServerError)
+			return
+		}
+		host := r.Header.Get("Host")
+		if host == "" {
+			host = r.Host
+		}
+		host = fmt.Sprintf("https://%s", host)
+		fmt.Println(host)
+		link, err := url.Parse(host)
+		if err != nil {
+			http.Error(w, "Internal Server Error", http.StatusInternalServerError)
+			return
+		}
+		location := link.ResolveReference(r.URL)
+
+		w.Header().Set("Location", location.String())
+		w.WriteHeader(http.StatusAccepted)
+	}).Methods(http.MethodPut)
+
+	return router
+}
