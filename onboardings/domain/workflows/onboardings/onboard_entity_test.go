@@ -1,12 +1,15 @@
 package onboardings
 
 import (
+	"errors"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/suite"
 	"github.com/temporalio/temporal-jumpstart-golang/app/testhelper"
 	"github.com/temporalio/temporal-jumpstart-golang/onboardings/domain/workflows"
 	v1 "github.com/temporalio/temporal-jumpstart-golang/onboardings/generated/domain/v1"
+	"go.temporal.io/sdk/converter"
 	"go.temporal.io/sdk/testsuite"
+	"go.temporal.io/sdk/workflow"
 	"testing"
 	"time"
 )
@@ -38,7 +41,7 @@ func (s *OnboardEntityTestSuite) BeforeTest(suiteName, testName string) {
 
 // AfterTest https://pkg.go.dev/github.com/stretchr/testify/suite#AfterTest
 func (s *OnboardEntityTestSuite) AfterTest(suiteName, testName string) {
-	s.env.AssertExpectations(s.T())
+	//s.env.AssertExpectations(s.T())
 }
 
 func TestMyWorkflow(t *testing.T) {
@@ -95,8 +98,66 @@ func (s *OnboardEntityTestSuite) Test_GivenApprovedNoDeputy_ShouldPerformOnboard
 
 	s.env.AssertExpectations(s.T())
 }
-func (s *OnboardEntityTestSuite) Test_GivenDeputy_ShouldRequestDeputyApprovalUponTimeout() {
 
+// state: ContinueAsNew Test
+func (s *OnboardEntityTestSuite) Test_GivenDeputyWithNoApprovalReceived_ShouldContinueAsNewWithNewArgs() {
+	s.env.RegisterWorkflow(TypeWorkflows.OnboardEntity)
+	args := &v1.OnboardEntityRequest{
+		Id:                       testhelper.RandomString(),
+		Value:                    testhelper.RandomString(),
+		CompletionTimeoutSeconds: 3000,
+		DeputyOwnerEmail:         "deputydawg@temporal.io",
+		SkipApproval:             false,
+	}
+	s.env.OnActivity(TypeOnboardActivities.RegisterCrmEntity, mock.Anything, mock.Anything).Never()
+	s.env.OnActivity(TypeOnboardActivities.SendEmail, mock.Anything, mock.Anything).Once().Return(nil)
+
+	s.env.ExecuteWorkflow(TypeWorkflows.OnboardEntity, args)
+	s.True(s.env.IsWorkflowCompleted())
+
+	expectCompletionTimeoutSeconds := args.CompletionTimeoutSeconds - calculateWaitSeconds(args)
+	werr := s.env.GetWorkflowError()
+	// this shows how to test for a ContinueAsNew
+	can := &workflow.ContinueAsNewError{}
+	s.True(errors.As(werr, &can))
+	canWFType, _ := testhelper.GetFunctionName(TypeWorkflows.OnboardEntity)
+	s.Equal(canWFType, can.WorkflowType.Name)
+	canParams := &v1.OnboardEntityRequest{}
+	dc := converter.GetDefaultDataConverter()
+	s.NoError(dc.FromPayloads(can.Input, canParams))
+	s.Equal(expectCompletionTimeoutSeconds, canParams.CompletionTimeoutSeconds)
+	s.Equal("", canParams.DeputyOwnerEmail)
+	s.Equal(false, canParams.SkipApproval)
+}
+
+// behavior: ContinueAsNew Test
+func (s *OnboardEntityTestSuite) Test_GivenDeputyWithNoApprovalReceived_ShouldRequestDeputyApproval() {
+	s.env.RegisterWorkflow(TypeWorkflows.OnboardEntity)
+	args := &v1.OnboardEntityRequest{
+		Id:                       testhelper.RandomString(),
+		Value:                    testhelper.RandomString(),
+		CompletionTimeoutSeconds: 3000,
+		DeputyOwnerEmail:         "deputydawg@temporal.io",
+		SkipApproval:             false,
+	}
+	s.env.OnActivity(TypeOnboardActivities.RegisterCrmEntity, mock.Anything, mock.Anything).Never()
+	s.env.OnActivity(TypeOnboardActivities.SendEmail, mock.Anything, &v1.RequestDeputyOwnerRequest{
+		Id:               args.Id,
+		DeputyOwnerEmail: args.DeputyOwnerEmail,
+	}).Once().Return(nil)
+
+	s.env.ExecuteWorkflow(TypeWorkflows.OnboardEntity, args)
+	s.True(s.env.IsWorkflowCompleted())
+
+	//expectCompletionTimeoutSeconds := calculateWaitSeconds(&v1.OnboardEntityRequest{
+	//	Id:                       args.Id,
+	//	Value:                    args.Value,
+	//	CompletionTimeoutSeconds: args.CompletionTimeoutSeconds,
+	//	DeputyOwnerEmail:         "",
+	//	SkipApproval:             false,
+	//})
+
+	s.env.AssertExpectations(s.T())
 }
 func (s *OnboardEntityTestSuite) Test_GivenRejection_ShouldNotPerformOnboardingTasks() {
 

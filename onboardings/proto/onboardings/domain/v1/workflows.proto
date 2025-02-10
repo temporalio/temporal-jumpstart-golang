@@ -8,7 +8,7 @@ enum Errors {
 message OnboardEntityRequest {
   string id = 1;
   string value = 2;
-  int64 completionTimeoutSeconds = 3;
+  uint64 completionTimeoutSeconds = 3;
   string deputyOwnerEmail = 4;
   bool skipApproval = 5;
 }
