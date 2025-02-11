@@ -130,7 +130,7 @@ func (workflows *Workflows) OnboardEntity(ctx workflow.Context, args *v1.Onboard
 				Comment: approval.GetComment(),
 			}
 		})
-		approvalsSelector.AddReceive(approvalChan, func(c workflow.ReceiveChannel, more bool) {
+		approvalsSelector.AddReceive(rejectChan, func(c workflow.ReceiveChannel, more bool) {
 			var rejection *v1.RejectEntityRequest
 			rejectChan.Receive(ctx, &rejection)
 			state.Approval = &v1.Approval{
@@ -177,10 +177,15 @@ func (workflows *Workflows) OnboardEntity(ctx workflow.Context, args *v1.Onboard
 			SkipApproval:             args.SkipApproval,
 		})
 	}
+	if state.Approval.Status == v1.ApprovalStatus_APPROVAL_STATUS_REJECTED {
+		logger.Info("Entity was rejected.")
+		return temporal.NewApplicationError(v1.Errors_ERRORS_ONBOARD_ENTITY_REJECTED.String(), v1.Errors_ERRORS_ONBOARD_ENTITY_REJECTED.String())
+	}
 	if state.Approval.Status != v1.ApprovalStatus_APPROVAL_STATUS_APPROVED {
 		logger.Info("Entity was either rejected or was not approved in time.")
-		return nil
+		return temporal.NewApplicationError(v1.Errors_ERRORS_ONBOARD_ENTITY_TIMED_OUT.String(), v1.Errors_ERRORS_ONBOARD_ENTITY_TIMED_OUT.String())
 	}
+	// the rest of this is only despite approval status
 	ao := workflow.WithActivityOptions(ctx, workflow.ActivityOptions{StartToCloseTimeout: time.Second * 30})
 	if err := workflow.ExecuteActivity(ao, OnboardEntityActivities.RegisterCrmEntity, &v1.RegisterCrmEntityRequest{
 		Id:    args.Id,

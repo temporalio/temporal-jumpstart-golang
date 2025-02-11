@@ -71,6 +71,7 @@ func (s *OnboardEntityTestSuite) Test_GivenInvalidArgs_ShouldFailTheWorkflow() {
 				CompletionTimeoutSeconds: 0,
 				DeputyOwnerEmail:         "",
 				SkipApproval:             false,
+				Timestamp:                timestamppb.New(time.Now()),
 			},
 		},
 		{
@@ -81,6 +82,7 @@ func (s *OnboardEntityTestSuite) Test_GivenInvalidArgs_ShouldFailTheWorkflow() {
 				CompletionTimeoutSeconds: 0,
 				DeputyOwnerEmail:         "",
 				SkipApproval:             false,
+				Timestamp:                timestamppb.New(time.Now()),
 			},
 		},
 		{
@@ -91,7 +93,8 @@ func (s *OnboardEntityTestSuite) Test_GivenInvalidArgs_ShouldFailTheWorkflow() {
 				CompletionTimeoutSeconds: 3000,
 				DeputyOwnerEmail:         "",
 				SkipApproval:             false,
-				Timestamp:                timestamppb.New(time.Time{}),
+				// zero time
+				Timestamp: timestamppb.New(time.Time{}),
 			},
 		},
 	}
@@ -150,14 +153,13 @@ func (s *OnboardEntityTestSuite) Test_GivenNeverApproved_DoesNotPerformOnboardin
 		CompletionTimeoutSeconds: 3000,
 		DeputyOwnerEmail:         "",
 		SkipApproval:             false,
+		Timestamp:                timestamppb.New(time.Now()),
 	}
 	s.env.OnActivity(OnboardEntityActivities.RegisterCrmEntity, mock.Anything).Never()
 	s.env.OnActivity(OnboardEntityActivities.SendEmail, mock.Anything).Never()
 
 	s.env.ExecuteWorkflow(TypeWorkflows.OnboardEntity, args)
 	s.True(s.env.IsWorkflowCompleted())
-	s.NoError(s.env.GetWorkflowError())
-
 	s.env.AssertExpectations(s.T())
 }
 
@@ -221,6 +223,7 @@ func (s *OnboardEntityTestSuite) Test_GivenApprovedNoDeputy_ShouldPerformOnboard
 		CompletionTimeoutSeconds: 3000,
 		DeputyOwnerEmail:         "",
 		SkipApproval:             false,
+		Timestamp:                timestamppb.New(time.Now()),
 	}
 	approval := &v1.ApproveEntityRequest{Comment: testhelper.RandomString()}
 	s.env.OnActivity(TypeOnboardActivities.RegisterCrmEntity, mock.Anything, &v1.RegisterCrmEntityRequest{
@@ -283,6 +286,7 @@ func (s *OnboardEntityTestSuite) Test_GivenDeputyWithNoApprovalReceived_ShouldRe
 		CompletionTimeoutSeconds: 3000,
 		DeputyOwnerEmail:         "deputydawg@temporal.io",
 		SkipApproval:             false,
+		Timestamp:                timestamppb.New(time.Now()),
 	}
 	s.env.OnActivity(TypeOnboardActivities.RegisterCrmEntity, mock.Anything, mock.Anything).Never()
 	s.env.OnActivity(TypeOnboardActivities.SendEmail, mock.Anything, &v1.RequestDeputyOwnerRequest{
@@ -297,7 +301,7 @@ func (s *OnboardEntityTestSuite) Test_GivenDeputyWithNoApprovalReceived_ShouldRe
 }
 
 // [state]
-func (s *OnboardEntityTestSuite) Test_GivenRejection_ShouldRevealRejectionComment_NotPerformOnboardingTasks() {
+func (s *OnboardEntityTestSuite) Test_GivenRejection_ShouldFailAndRevealRejectionComment() {
 	s.env.RegisterWorkflow(TypeWorkflows.OnboardEntity)
 	args := &v1.OnboardEntityRequest{
 		Id:                       testhelper.RandomString(),
@@ -305,22 +309,26 @@ func (s *OnboardEntityTestSuite) Test_GivenRejection_ShouldRevealRejectionCommen
 		CompletionTimeoutSeconds: 3000,
 		DeputyOwnerEmail:         "",
 		SkipApproval:             false,
+		Timestamp:                timestamppb.New(time.Now()),
 	}
 	rejection := &v1.RejectEntityRequest{Comment: testhelper.RandomString()}
 	state := &v1.EntityOnboardingStateResponse{}
 	s.env.RegisterDelayedCallback(func() {
 		s.env.SignalWorkflow(workflows.SignalName(rejection), rejection)
 	}, time.Second*2)
-	s.env.RegisterDelayedCallback(func() {
-		val, err := s.env.QueryWorkflow(QueryEntityOnboardingState)
-		s.NoError(err)
-		s.NoError(val.Get(&state))
-	}, time.Second*3)
 
 	s.env.ExecuteWorkflow(TypeWorkflows.OnboardEntity, args)
 	s.True(s.env.IsWorkflowCompleted())
-	s.Error(s.env.GetWorkflowError())
+	werr := s.env.GetWorkflowError()
+	s.NotNil(werr)
+	var appErr *temporal.ApplicationError
+	errors.As(werr, &appErr)
+	s.Equal(v1.Errors_ERRORS_ONBOARD_ENTITY_REJECTED.String(), appErr.Type())
 
+	val, err := s.env.QueryWorkflow(QueryEntityOnboardingState)
+	s.NoError(err)
+	s.NoError(val.Get(&state))
+	s.Equal(v1.ApprovalStatus_APPROVAL_STATUS_REJECTED, state.Approval.Status)
 	s.Equal(rejection.Comment, state.Approval.GetComment())
 }
 
@@ -333,6 +341,7 @@ func (s *OnboardEntityTestSuite) Test_GivenRejection_ShouldNotPerformOnboardingT
 		CompletionTimeoutSeconds: 3000,
 		DeputyOwnerEmail:         "",
 		SkipApproval:             false,
+		Timestamp:                timestamppb.New(time.Now()),
 	}
 	approval := &v1.RejectEntityRequest{Comment: testhelper.RandomString()}
 	s.env.OnActivity(TypeOnboardActivities.RegisterCrmEntity, mock.Anything, mock.Anything).Never()
@@ -343,7 +352,6 @@ func (s *OnboardEntityTestSuite) Test_GivenRejection_ShouldNotPerformOnboardingT
 
 	s.env.ExecuteWorkflow(TypeWorkflows.OnboardEntity, args)
 	s.True(s.env.IsWorkflowCompleted())
-	s.NoError(s.env.GetWorkflowError())
 
 	s.env.AssertExpectations(s.T())
 }

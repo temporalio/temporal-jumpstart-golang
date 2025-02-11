@@ -7,6 +7,7 @@ package proto.onboardings.domain.v1.workflows;
 enum Errors {
   ERRORS_ONBOARD_ENTITY_TIMED_OUT = 0;
   ERRORS_ONBOARD_ENTITY_INVALID_ARGS = 1;
+  ERRORS_ONBOARD_ENTITY_REJECTED = 2;
 }
 message OnboardEntityRequest {
 
