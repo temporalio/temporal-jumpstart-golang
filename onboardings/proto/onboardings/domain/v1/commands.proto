@@ -8,7 +8,7 @@ message RegisterCrmEntityRequest {
 }
 message RequestDeputyOwnerRequest {
   string id = 1;
-  string deputyOwnerEmail = 2;
+  string deputy_owner_email = 2;
 }
 message ApproveEntityRequest {
   string comment = 1;
