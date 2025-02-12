@@ -10,11 +10,8 @@ import (
 	"time"
 )
 
-// OnboardEntity is always the `latest` of this Application.
-// In our scenario this is `V2`.
-// Previous versions, even when using "Patched" strategy, should be copied over in the file system to support
-// Replay testing. This allows no loading of history via JSON files and history can be piped in directly.
-func (workflows *Workflows) OnboardEntity(ctx workflow.Context, args *v1.OnboardEntityRequest) error {
+// OnboardEntityV1 is the initial launch (v1) of this workflow
+func (workflows *Workflows) OnboardEntityV1(ctx workflow.Context, args *v1.OnboardEntityRequest) error {
 
 	// 1. initialize state ASAP
 	state := &v1.EntityOnboardingStateResponse{
@@ -87,14 +84,11 @@ func (workflows *Workflows) OnboardEntity(ctx workflow.Context, args *v1.Onboard
 
 	// 5. perform workflow behavior
 
-	conditionMet, err := workflow.AwaitWithTimeout(ctx, time.Duration(waitSeconds)*time.Second, func() bool {
+	conditionMet, _ := workflow.AwaitWithTimeout(ctx, time.Duration(waitSeconds)*time.Second, func() bool {
 		return state.Approval != nil && state.Approval.Status != v1.ApprovalStatus_APPROVAL_STATUS_PENDING
 	})
 	// no longer eligible for approval while we figure out what to do next
 	cancelApprovalWindow()
-	if err = tryHandleCancellation(err); err != nil {
-		return err
-	}
 
 	if !conditionMet {
 		if !notifyDeputy {
@@ -107,7 +101,6 @@ func (workflows *Workflows) OnboardEntity(ctx workflow.Context, args *v1.Onboard
 				MaximumAttempts: 2,
 			},
 		})
-
 		if err := workflow.ExecuteActivity(notificationCtx, TypeOnboardActivities.SendEmail, &v1.RequestDeputyOwnerRequest{
 			Id:               args.Id,
 			DeputyOwnerEmail: args.DeputyOwnerEmail,
@@ -115,17 +108,6 @@ func (workflows *Workflows) OnboardEntity(ctx workflow.Context, args *v1.Onboard
 			logger.Error("failed to notify deputy owner", "err", err)
 			return err
 		}
-
-		err = workflow.Await(ctx, func() bool {
-			// block until any buffered (late) messages might have come in
-			// But note this is somewhat redundant since we explicitly `cancelApprovalWindow` when
-			// we have not made progress in time.
-			return workflow.AllHandlersFinished(ctx)
-		})
-		if err = tryHandleCancellation(err); err != nil {
-			return err
-		}
-
 		// 1. send email to the deputy owner to request approval.
 		// 2. continue this workflow as new without the deputy owner email and reduce the amount of time we are willing to wait.
 		return workflow.NewContinueAsNewError(ctx, TypeWorkflows.OnboardEntity, &v1.OnboardEntityRequest{
@@ -144,9 +126,8 @@ func (workflows *Workflows) OnboardEntity(ctx workflow.Context, args *v1.Onboard
 		logger.Info("Entity was either rejected or was not approved in time.")
 		return temporal.NewApplicationError(v1.Errors_ERRORS_ONBOARD_ENTITY_TIMED_OUT.String(), v1.Errors_ERRORS_ONBOARD_ENTITY_TIMED_OUT.String())
 	}
-	// the rest of this is for approved onboardings
-	actCtx, _ := workflow.NewDisconnectedContext(ctx)
-	ao := workflow.WithActivityOptions(actCtx, workflow.ActivityOptions{StartToCloseTimeout: time.Second * 30})
+	// the rest of this is only despite approval status
+	ao := workflow.WithActivityOptions(ctx, workflow.ActivityOptions{StartToCloseTimeout: time.Second * 30})
 	if err := workflow.ExecuteActivity(ao, OnboardEntityActivities.RegisterCrmEntity, &v1.RegisterCrmEntityRequest{
 		Id:    args.Id,
 		Value: args.Value,

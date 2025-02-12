@@ -3,8 +3,8 @@ package onboardings
 import (
 	"context"
 	"github.com/stretchr/testify/suite"
-	"github.com/temporalio/temporal-jumpstart-golang/app/domain/scaffold/messages/workflows"
 	"github.com/temporalio/temporal-jumpstart-golang/app/testhelper"
+	v1 "github.com/temporalio/temporal-jumpstart-golang/onboardings/generated/domain/v1"
 	"go.temporal.io/sdk/client"
 	"go.temporal.io/sdk/testsuite"
 	"go.temporal.io/sdk/worker"
@@ -12,9 +12,9 @@ import (
 	"testing"
 )
 
-// MyWorkflowReplayTestSuite
+// OnboardEntityReplayTestSuite
 // https://docs.temporal.io/docs/go/testing/
-type MyWorkflowReplayTestSuite struct {
+type OnboardEntityReplayTestSuite struct {
 	suite.Suite
 	taskQueue string
 	server    *testsuite.DevServer
@@ -23,7 +23,7 @@ type MyWorkflowReplayTestSuite struct {
 }
 
 // SetupSuite https://pkg.go.dev/github.com/stretchr/testify/suite#SetupAllSuite
-func (s *MyWorkflowReplayTestSuite) SetupSuite() {
+func (s *OnboardEntityReplayTestSuite) SetupSuite() {
 	server, err := testsuite.StartDevServer(context.Background(), testsuite.DevServerOptions{
 		LogLevel: "error",
 	})
@@ -36,18 +36,18 @@ func (s *MyWorkflowReplayTestSuite) SetupSuite() {
 }
 
 // SetupTest https://pkg.go.dev/github.com/stretchr/testify/suite#SetupTestSuite
-func (s *MyWorkflowReplayTestSuite) SetupTest() {
+func (s *OnboardEntityReplayTestSuite) SetupTest() {
 }
 
 // BeforeTest https://pkg.go.dev/github.com/stretchr/testify/suite#BeforeTest
-func (s *MyWorkflowReplayTestSuite) BeforeTest(suiteName, testName string) {
+func (s *OnboardEntityReplayTestSuite) BeforeTest(suiteName, testName string) {
 
 }
 
 // AfterTest https://pkg.go.dev/github.com/stretchr/testify/suite#AfterTest
-func (s *MyWorkflowReplayTestSuite) AfterTest(suiteName, testName string) {
+func (s *OnboardEntityReplayTestSuite) AfterTest(suiteName, testName string) {
 }
-func (s *MyWorkflowReplayTestSuite) TearDownSuite() {
+func (s *OnboardEntityReplayTestSuite) TearDownSuite() {
 	s.worker.Stop()
 
 	err := s.server.Stop()
@@ -55,14 +55,14 @@ func (s *MyWorkflowReplayTestSuite) TearDownSuite() {
 		s.Fail("Failed to stop server: %w", err)
 	}
 }
-func (s *MyWorkflowReplayTestSuite) Test_ReplayExposesNDE() {
-	var historySource = TypeWorkflows.OnboardEntity
-	var historyTarget = TypeWorkflows.MyWorkflowV1
+func (s *OnboardEntityReplayTestSuite) Test_ReplayExposesNDE() {
+	var historySource = TypeWorkflows.OnboardEntityV1
+	var historyTarget = TypeWorkflows.OnboardEntity
 
 	workflowTypeName, _ := testhelper.GetFunctionName(historySource)
 
-	args := &workflows.StartMyWorkflowRequest{
-		ID:    testhelper.RandomString(),
+	args := &v1.OnboardEntityRequest{
+		Id:    testhelper.RandomString(),
 		Value: testhelper.RandomString(),
 	}
 
@@ -71,7 +71,7 @@ func (s *MyWorkflowReplayTestSuite) Test_ReplayExposesNDE() {
 	s.worker.RegisterWorkflow(historySource)
 	run, err := s.client.ExecuteWorkflow(ctx,
 		client.StartWorkflowOptions{
-			ID:        args.ID,
+			ID:        args.Id,
 			TaskQueue: s.taskQueue,
 		},
 		historySource, args)
@@ -80,7 +80,7 @@ func (s *MyWorkflowReplayTestSuite) Test_ReplayExposesNDE() {
 	s.NoError(run.Get(ctx, nil))
 
 	// grab the WF history
-	history, err := testhelper.GetWorkflowHistory(ctx, s.client, args.ID)
+	history, err := testhelper.GetWorkflowHistory(ctx, s.client, args.Id)
 
 	// attempt replay
 	replayer := worker.NewWorkflowReplayer()
@@ -96,5 +96,5 @@ func (s *MyWorkflowReplayTestSuite) Test_ReplayExposesNDE() {
 }
 
 func TestMyWorkflowReplay(t *testing.T) {
-	suite.Run(t, &MyWorkflowReplayTestSuite{})
+	suite.Run(t, &OnboardEntityReplayTestSuite{})
 }

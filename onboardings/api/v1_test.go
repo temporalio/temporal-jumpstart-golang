@@ -153,8 +153,7 @@ func TestV1GetOnboardingState(t *testing.T) {
 		},
 	}
 	state := &domainv1.EntityOnboardingStateResponse{
-		Id:     workflowId,
-		Status: enums.WORKFLOW_EXECUTION_STATUS_RUNNING.String(),
+		Id: workflowId,
 		SentRequest: &domainv1.OnboardEntityRequest{
 			Id:                       workflowId,
 			Value:                    testhelper.RandomString(),
@@ -163,7 +162,7 @@ func TestV1GetOnboardingState(t *testing.T) {
 			SkipApproval:             false,
 		},
 		Approval: &domainv1.Approval{
-			Status:  domainv1.ApprovalStatus_PENDING,
+			Status:  domainv1.ApprovalStatus_APPROVAL_STATUS_PENDING,
 			Comment: "",
 		},
 	}
@@ -217,8 +216,7 @@ func TestV1GetGivenExistingOnboardingFetchesCurrentState(t *testing.T) {
 		},
 	}
 	state := &domainv1.EntityOnboardingStateResponse{
-		Id:     workflowId,
-		Status: enums.WORKFLOW_EXECUTION_STATUS_RUNNING.String(),
+		Id: workflowId,
 		SentRequest: &domainv1.OnboardEntityRequest{
 			Id:                       workflowId,
 			Value:                    testhelper.RandomString(),
@@ -227,7 +225,7 @@ func TestV1GetGivenExistingOnboardingFetchesCurrentState(t *testing.T) {
 			SkipApproval:             false,
 		},
 		Approval: &domainv1.Approval{
-			Status:  domainv1.ApprovalStatus_PENDING,
+			Status:  domainv1.ApprovalStatus_APPROVAL_STATUS_PENDING,
 			Comment: "",
 		},
 	}

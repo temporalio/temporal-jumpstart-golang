@@ -343,11 +343,88 @@ func (s *OnboardEntityTestSuite) Test_GivenRejection_ShouldNotPerformOnboardingT
 		SkipApproval:             false,
 		Timestamp:                timestamppb.New(time.Now()),
 	}
-	approval := &v1.RejectEntityRequest{Comment: testhelper.RandomString()}
+	rejection := &v1.RejectEntityRequest{Comment: testhelper.RandomString()}
 	s.env.OnActivity(TypeOnboardActivities.RegisterCrmEntity, mock.Anything, mock.Anything).Never()
 	s.env.OnActivity(TypeOnboardActivities.SendEmail, mock.Anything, mock.Anything).Never()
 	s.env.RegisterDelayedCallback(func() {
+		s.env.SignalWorkflow(workflows.SignalName(rejection), rejection)
+	}, time.Second*2)
+
+	s.env.ExecuteWorkflow(TypeWorkflows.OnboardEntity, args)
+	s.True(s.env.IsWorkflowCompleted())
+
+	s.env.AssertExpectations(s.T())
+}
+
+// [state]
+func (s *OnboardEntityTestSuite) Test_GivenPending_ShouldExitUponCancellation() {
+	s.env.RegisterWorkflow(TypeWorkflows.OnboardEntity)
+	args := &v1.OnboardEntityRequest{
+		Id:                       testhelper.RandomString(),
+		Value:                    testhelper.RandomString(),
+		CompletionTimeoutSeconds: 3000,
+		DeputyOwnerEmail:         "",
+		SkipApproval:             false,
+		Timestamp:                timestamppb.New(time.Now()),
+	}
+	s.env.RegisterDelayedCallback(func() {
+		s.env.CancelWorkflow()
+	}, time.Second*2)
+
+	s.env.ExecuteWorkflow(TypeWorkflows.OnboardEntity, args)
+	s.True(s.env.IsWorkflowCompleted())
+	s.True(temporal.IsCanceledError(s.env.GetWorkflowError()))
+}
+
+// [behavior]
+func (s *OnboardEntityTestSuite) Test_GivenPending_ShouldNotPerformOnboardingTasksWhenCancelled() {
+	s.env.RegisterWorkflow(TypeWorkflows.OnboardEntity)
+	args := &v1.OnboardEntityRequest{
+		Id:                       testhelper.RandomString(),
+		Value:                    testhelper.RandomString(),
+		CompletionTimeoutSeconds: 3000,
+		DeputyOwnerEmail:         "",
+		SkipApproval:             false,
+		Timestamp:                timestamppb.New(time.Now()),
+	}
+	s.env.OnActivity(TypeOnboardActivities.RegisterCrmEntity, mock.Anything, mock.Anything).Never()
+	s.env.OnActivity(TypeOnboardActivities.SendEmail, mock.Anything, mock.Anything).Never()
+	s.env.RegisterDelayedCallback(func() {
+		s.env.CancelWorkflow()
+	}, time.Second*2)
+
+	s.env.ExecuteWorkflow(TypeWorkflows.OnboardEntity, args)
+	s.True(s.env.IsWorkflowCompleted())
+
+	s.env.AssertExpectations(s.T())
+}
+
+// [behavior]
+func (s *OnboardEntityTestSuite) Test_WhenApproved_ShouldPerformOnboardingTasksThoughCancelled() {
+	s.env.RegisterWorkflow(TypeWorkflows.OnboardEntity)
+	args := &v1.OnboardEntityRequest{
+		Id:                       testhelper.RandomString(),
+		Value:                    testhelper.RandomString(),
+		CompletionTimeoutSeconds: 3000,
+		DeputyOwnerEmail:         "",
+		SkipApproval:             false,
+		Timestamp:                timestamppb.New(time.Now()),
+	}
+	approval := &v1.ApproveEntityRequest{Comment: testhelper.RandomString()}
+	s.env.OnActivity(TypeOnboardActivities.RegisterCrmEntity, mock.Anything, &v1.RegisterCrmEntityRequest{
+		Id:    args.Id,
+		Value: args.Value,
+	}).Once().Return(nil)
+	s.env.OnActivity(TypeOnboardActivities.SendEmail, mock.Anything, &v1.RequestDeputyOwnerRequest{
+		Id:               args.Id,
+		DeputyOwnerEmail: args.DeputyOwnerEmail,
+	}).Never()
+	s.env.RegisterDelayedCallback(func() {
 		s.env.SignalWorkflow(workflows.SignalName(approval), approval)
+	}, time.Second*2)
+	s.env.RegisterDelayedCallback(func() {
+		// this is basically ignored
+		s.env.CancelWorkflow()
 	}, time.Second*2)
 
 	s.env.ExecuteWorkflow(TypeWorkflows.OnboardEntity, args)
