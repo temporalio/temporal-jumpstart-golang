@@ -5,6 +5,7 @@ lint:
     - STANDARD
 modules:
   - path: proto/onboardings
+  - path: proto/snailforce
 #  - path: proto/onboardings/domain
 #      use:
 #        - STANDARD

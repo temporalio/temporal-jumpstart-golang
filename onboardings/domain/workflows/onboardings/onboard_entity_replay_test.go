@@ -4,12 +4,15 @@ import (
 	"context"
 	"github.com/stretchr/testify/suite"
 	"github.com/temporalio/temporal-jumpstart-golang/app/testhelper"
+	"github.com/temporalio/temporal-jumpstart-golang/onboardings/domain/workflows"
 	v1 "github.com/temporalio/temporal-jumpstart-golang/onboardings/generated/domain/v1"
 	"go.temporal.io/sdk/client"
 	"go.temporal.io/sdk/testsuite"
 	"go.temporal.io/sdk/worker"
 	"go.temporal.io/sdk/workflow"
+	"google.golang.org/protobuf/types/known/timestamppb"
 	"testing"
+	"time"
 )
 
 // OnboardEntityReplayTestSuite
@@ -55,15 +58,18 @@ func (s *OnboardEntityReplayTestSuite) TearDownSuite() {
 		s.Fail("Failed to stop server: %w", err)
 	}
 }
-func (s *OnboardEntityReplayTestSuite) Test_ReplayExposesNDE() {
+func (s *OnboardEntityReplayTestSuite) Test_ReplayWithApproval_ExposesNDE() {
 	var historySource = TypeWorkflows.OnboardEntityV1
 	var historyTarget = TypeWorkflows.OnboardEntity
 
 	workflowTypeName, _ := testhelper.GetFunctionName(historySource)
 
 	args := &v1.OnboardEntityRequest{
-		Id:    testhelper.RandomString(),
-		Value: testhelper.RandomString(),
+		Id:                       testhelper.RandomString(),
+		Value:                    testhelper.RandomString(),
+		CompletionTimeoutSeconds: 5,
+		Timestamp:                timestamppb.Now(),
+		DeputyOwnerEmail:         "",
 	}
 
 	ctx := context.Background()
@@ -76,8 +82,13 @@ func (s *OnboardEntityReplayTestSuite) Test_ReplayExposesNDE() {
 		},
 		historySource, args)
 	s.NoError(err)
+	time.Sleep(time.Second * 2)
+	var approval = &v1.ApproveEntityRequest{Comment: testhelper.RandomString()}
+	s.NoError(s.client.SignalWorkflow(ctx, run.GetID(), "", workflows.SignalName(approval), approval))
 	// either wait for the WF to complete or give some time for the Task to reply back with events
 	s.NoError(run.Get(ctx, nil))
+
+	s.T().Log("Workflow completed successfully")
 
 	// grab the WF history
 	history, err := testhelper.GetWorkflowHistory(ctx, s.client, args.Id)
