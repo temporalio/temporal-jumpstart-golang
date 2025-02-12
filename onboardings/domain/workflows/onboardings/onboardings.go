@@ -1,7 +1,7 @@
 package onboardings
 
 import (
-	v1 "github.com/temporalio/temporal-jumpstart-golang/onboardings/generated/domain/v1"
+	workflowsv1 "github.com/temporalio/temporal-jumpstart-golang/onboardings/generated/onboardings/domain/workflows/v1"
 	"go.temporal.io/sdk/temporal"
 	"math"
 	"strings"
@@ -10,17 +10,17 @@ import (
 
 // assertValidArgs is a poor-man's implementation not providing very specific details on which args are "invalid"
 // but instead just failing hard in the event of missing or bad args
-func assertValidArgs(args *v1.OnboardEntityRequest) error {
+func assertValidArgs(args *workflowsv1.OnboardEntityRequest) error {
 	if strings.TrimSpace(args.Id) != "" &&
 		strings.TrimSpace(args.Value) != "" &&
 		!args.Timestamp.AsTime().IsZero() {
 		return nil
 	}
-	return temporal.NewApplicationError(v1.Errors_ERRORS_ONBOARD_ENTITY_INVALID_ARGS.String(), v1.Errors_ERRORS_ONBOARD_ENTITY_INVALID_ARGS.String())
+	return temporal.NewApplicationError(workflowsv1.Errors_ERRORS_ONBOARD_ENTITY_INVALID_ARGS.String(), workflowsv1.Errors_ERRORS_ONBOARD_ENTITY_INVALID_ARGS.String())
 }
 
 // resolveCompletionTimeoutSeconds calculates a valid completion timeout duration
-func resolveCompletionTimeoutSeconds(args *v1.OnboardEntityRequest) uint64 {
+func resolveCompletionTimeoutSeconds(args *workflowsv1.OnboardEntityRequest) uint64 {
 	if args.SkipApproval {
 		return 0
 	}
@@ -34,7 +34,7 @@ func resolveCompletionTimeoutSeconds(args *v1.OnboardEntityRequest) uint64 {
 // calculateWaitSeconds calcs the time remaining before the Workflow shall make progress
 // taking into consideration the DeputyOwner argument and the Product requirement that we shall
 // give 40% of the time before reaching out to the deputy to ask for approval.
-func calculateWaitSeconds(now time.Time, args *v1.OnboardEntityRequest) uint64 {
+func calculateWaitSeconds(now time.Time, args *workflowsv1.OnboardEntityRequest) uint64 {
 	completionTimeoutSeconds := resolveCompletionTimeoutSeconds(args)
 	if completionTimeoutSeconds == 0 {
 		return completionTimeoutSeconds
@@ -49,10 +49,10 @@ func calculateWaitSeconds(now time.Time, args *v1.OnboardEntityRequest) uint64 {
 	return uint64(math.Max(threshold.Sub(now).Seconds(), 0))
 }
 
-func calculateCompletionThreshold(args *v1.OnboardEntityRequest) time.Time {
+func calculateCompletionThreshold(args *workflowsv1.OnboardEntityRequest) time.Time {
 	return args.Timestamp.AsTime().Add(time.Second * time.Duration(resolveCompletionTimeoutSeconds(args)))
 }
-func calculateElapsedTimeSinceStarted(now time.Time, args *v1.OnboardEntityRequest) uint64 {
+func calculateElapsedTimeSinceStarted(now time.Time, args *workflowsv1.OnboardEntityRequest) uint64 {
 	return uint64(now.Sub(args.Timestamp.AsTime()).Seconds())
 }
 

@@ -2,7 +2,7 @@ package onboardings
 
 import (
 	"context"
-	v1 "github.com/temporalio/temporal-jumpstart-golang/onboardings/generated/domain/v1"
+	commandsv1 "github.com/temporalio/temporal-jumpstart-golang/onboardings/generated/onboardings/domain/commands/v1"
 	"time"
 )
 
@@ -14,8 +14,8 @@ const QueryEntityOnboardingState = "entityOnboardingState"
 var DefaultCompletionTimeoutSeconds = uint64((7 * 24 * time.Hour).Seconds())
 
 type OnboardEntityActivities interface {
-	RegisterCrmEntity(ctx context.Context, q *v1.RegisterCrmEntityRequest) error
-	SendEmail(ctx context.Context, cmd *v1.RequestDeputyOwnerRequest) error
+	RegisterCrmEntity(ctx context.Context, q *commandsv1.RegisterCrmEntityRequest) error
+	SendEmail(ctx context.Context, cmd *commandsv1.RequestDeputyOwnerRequest) error
 }
 
 type Workflows struct{}

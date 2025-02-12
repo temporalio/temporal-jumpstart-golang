@@ -2,7 +2,7 @@ syntax = "proto3";
 
 import "google/protobuf/timestamp.proto";
 
-package proto.onboardings.domain.v1.workflows;
+package onboardings.domain.workflows.v1;
 
 enum Errors {
   ERRORS_ONBOARD_ENTITY_TIMED_OUT = 0;

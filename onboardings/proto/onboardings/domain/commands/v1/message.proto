@@ -1,6 +1,6 @@
 syntax = "proto3";
 
-package proto.onboardings.domain.v1.commands;
+package onboardings.domain.commands.v1;
 
 message RegisterCrmEntityRequest {
   string id = 1;

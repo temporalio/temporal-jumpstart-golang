@@ -5,7 +5,8 @@ import (
 	"github.com/stretchr/testify/suite"
 	"github.com/temporalio/temporal-jumpstart-golang/app/testhelper"
 	"github.com/temporalio/temporal-jumpstart-golang/onboardings/domain/workflows"
-	v1 "github.com/temporalio/temporal-jumpstart-golang/onboardings/generated/domain/v1"
+	commandsv1 "github.com/temporalio/temporal-jumpstart-golang/onboardings/generated/onboardings/domain/commands/v1"
+	workflowsv1 "github.com/temporalio/temporal-jumpstart-golang/onboardings/generated/onboardings/domain/workflows/v1"
 	"go.temporal.io/sdk/client"
 	"go.temporal.io/sdk/testsuite"
 	"go.temporal.io/sdk/worker"
@@ -64,7 +65,7 @@ func (s *OnboardEntityReplayTestSuite) Test_ReplayWithApproval_ExposesNDE() {
 
 	workflowTypeName, _ := testhelper.GetFunctionName(historySource)
 
-	args := &v1.OnboardEntityRequest{
+	args := &workflowsv1.OnboardEntityRequest{
 		Id:                       testhelper.RandomString(),
 		Value:                    testhelper.RandomString(),
 		CompletionTimeoutSeconds: 5,
@@ -83,7 +84,7 @@ func (s *OnboardEntityReplayTestSuite) Test_ReplayWithApproval_ExposesNDE() {
 		historySource, args)
 	s.NoError(err)
 	time.Sleep(time.Second * 2)
-	var approval = &v1.ApproveEntityRequest{Comment: testhelper.RandomString()}
+	var approval = &commandsv1.ApproveEntityRequest{Comment: testhelper.RandomString()}
 	s.NoError(s.client.SignalWorkflow(ctx, run.GetID(), "", workflows.SignalName(approval), approval))
 	// either wait for the WF to complete or give some time for the Task to reply back with events
 	s.NoError(run.Get(ctx, nil))

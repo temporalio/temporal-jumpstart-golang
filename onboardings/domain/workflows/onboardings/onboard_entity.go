@@ -2,7 +2,10 @@ package onboardings
 
 import (
 	workflows2 "github.com/temporalio/temporal-jumpstart-golang/onboardings/domain/workflows"
-	v1 "github.com/temporalio/temporal-jumpstart-golang/onboardings/generated/domain/v1"
+	commandsv1 "github.com/temporalio/temporal-jumpstart-golang/onboardings/generated/onboardings/domain/commands/v1"
+	queriesv1 "github.com/temporalio/temporal-jumpstart-golang/onboardings/generated/onboardings/domain/queries/v1"
+	v1 "github.com/temporalio/temporal-jumpstart-golang/onboardings/generated/onboardings/domain/values/v1"
+	workflowsv1 "github.com/temporalio/temporal-jumpstart-golang/onboardings/generated/onboardings/domain/workflows/v1"
 	"go.temporal.io/sdk/log"
 	"go.temporal.io/sdk/temporal"
 	"go.temporal.io/sdk/workflow"
@@ -14,10 +17,10 @@ import (
 // In our scenario this is `V2`.
 // Previous versions, even when using "Patched" strategy, should be copied over in the file system to support
 // Replay testing. This allows no loading of history via JSON files and history can be piped in directly.
-func (workflows *Workflows) OnboardEntity(ctx workflow.Context, args *v1.OnboardEntityRequest) error {
+func (workflows *Workflows) OnboardEntity(ctx workflow.Context, args *workflowsv1.OnboardEntityRequest) error {
 
 	// 1. initialize state ASAP
-	state := &v1.EntityOnboardingStateResponse{
+	state := &queriesv1.EntityOnboardingStateResponse{
 		Id:          args.Id,
 		SentRequest: args,
 		Approval: &v1.Approval{
@@ -33,13 +36,13 @@ func (workflows *Workflows) OnboardEntity(ctx workflow.Context, args *v1.Onboard
 	logger.Info("Starting OnboardEntity")
 
 	// 2. configure reads
-	if err := workflow.SetQueryHandlerWithOptions(ctx, QueryEntityOnboardingState, func() (*v1.EntityOnboardingStateResponse, error) {
+	if err := workflow.SetQueryHandlerWithOptions(ctx, QueryEntityOnboardingState, func() (*queriesv1.EntityOnboardingStateResponse, error) {
 		now := workflow.Now(ctx)
 		logger.Debug("Onboarding State", "now", now.String())
 		threshold := calculateCompletionThreshold(args)
 
 		timeRemaining := threshold.Sub(workflow.Now(ctx))
-		return &v1.EntityOnboardingStateResponse{
+		return &queriesv1.EntityOnboardingStateResponse{
 			Id:                           state.Id,
 			SentRequest:                  args,
 			Approval:                     state.Approval,
@@ -56,18 +59,18 @@ func (workflows *Workflows) OnboardEntity(ctx workflow.Context, args *v1.Onboard
 		return err
 	}
 	if calculateCompletionThreshold(args).Sub(workflow.Now(ctx)).Seconds() <= 0 {
-		return temporal.NewApplicationError(v1.Errors_ERRORS_ONBOARD_ENTITY_TIMED_OUT.String(), v1.Errors_ERRORS_ONBOARD_ENTITY_TIMED_OUT.String())
+		return temporal.NewApplicationError(workflowsv1.Errors_ERRORS_ONBOARD_ENTITY_TIMED_OUT.String(), workflowsv1.Errors_ERRORS_ONBOARD_ENTITY_TIMED_OUT.String())
 	}
 
 	// 4. configure write handlers
 	approvalCtx, cancelApprovalWindow := workflow.WithCancel(ctx)
-	approvalChan := workflow.GetSignalChannel(approvalCtx, workflows2.SignalName(&v1.ApproveEntityRequest{}))
-	rejectChan := workflow.GetSignalChannel(approvalCtx, workflows2.SignalName(&v1.RejectEntityRequest{}))
+	approvalChan := workflow.GetSignalChannel(approvalCtx, workflows2.SignalName(&commandsv1.ApproveEntityRequest{}))
+	rejectChan := workflow.GetSignalChannel(approvalCtx, workflows2.SignalName(&commandsv1.RejectEntityRequest{}))
 
 	approvalsSelector := workflow.NewNamedSelector(approvalCtx, "approvals")
 	workflow.GoNamed(ctx, "approvals", func(ctx workflow.Context) {
 		approvalsSelector.AddReceive(approvalChan, func(c workflow.ReceiveChannel, more bool) {
-			var approval *v1.ApproveEntityRequest
+			var approval *commandsv1.ApproveEntityRequest
 			approvalChan.Receive(ctx, &approval)
 			state.Approval = &v1.Approval{
 				Status:  v1.ApprovalStatus_APPROVAL_STATUS_APPROVED,
@@ -75,7 +78,7 @@ func (workflows *Workflows) OnboardEntity(ctx workflow.Context, args *v1.Onboard
 			}
 		})
 		approvalsSelector.AddReceive(rejectChan, func(c workflow.ReceiveChannel, more bool) {
-			var rejection *v1.RejectEntityRequest
+			var rejection *commandsv1.RejectEntityRequest
 			rejectChan.Receive(ctx, &rejection)
 			state.Approval = &v1.Approval{
 				Status:  v1.ApprovalStatus_APPROVAL_STATUS_REJECTED,
@@ -98,7 +101,7 @@ func (workflows *Workflows) OnboardEntity(ctx workflow.Context, args *v1.Onboard
 
 	if !conditionMet {
 		if !notifyDeputy {
-			return temporal.NewApplicationError("Approval was not met in time", v1.Errors_ERRORS_ONBOARD_ENTITY_TIMED_OUT.String())
+			return temporal.NewApplicationError("Approval was not met in time", workflowsv1.Errors_ERRORS_ONBOARD_ENTITY_TIMED_OUT.String())
 		}
 		notificationCtx := workflow.WithActivityOptions(ctx, workflow.ActivityOptions{
 			StartToCloseTimeout: time.Second * 30,
@@ -108,7 +111,7 @@ func (workflows *Workflows) OnboardEntity(ctx workflow.Context, args *v1.Onboard
 			},
 		})
 
-		if err := workflow.ExecuteActivity(notificationCtx, TypeOnboardActivities.SendEmail, &v1.RequestDeputyOwnerRequest{
+		if err := workflow.ExecuteActivity(notificationCtx, TypeOnboardActivities.SendEmail, &commandsv1.RequestDeputyOwnerRequest{
 			Id:               args.Id,
 			DeputyOwnerEmail: args.DeputyOwnerEmail,
 		}).Get(notificationCtx, nil); err != nil {
@@ -128,7 +131,7 @@ func (workflows *Workflows) OnboardEntity(ctx workflow.Context, args *v1.Onboard
 
 		// 1. send email to the deputy owner to request approval.
 		// 2. continue this workflow as new without the deputy owner email and reduce the amount of time we are willing to wait.
-		return workflow.NewContinueAsNewError(ctx, TypeWorkflows.OnboardEntity, &v1.OnboardEntityRequest{
+		return workflow.NewContinueAsNewError(ctx, TypeWorkflows.OnboardEntity, &workflowsv1.OnboardEntityRequest{
 			Id:                       args.Id,
 			Value:                    args.Value,
 			CompletionTimeoutSeconds: args.CompletionTimeoutSeconds - waitSeconds, // offset how long we will wait
@@ -138,16 +141,16 @@ func (workflows *Workflows) OnboardEntity(ctx workflow.Context, args *v1.Onboard
 	}
 	if state.Approval.Status == v1.ApprovalStatus_APPROVAL_STATUS_REJECTED {
 		logger.Info("Entity was rejected.")
-		return temporal.NewApplicationError(v1.Errors_ERRORS_ONBOARD_ENTITY_REJECTED.String(), v1.Errors_ERRORS_ONBOARD_ENTITY_REJECTED.String())
+		return temporal.NewApplicationError(workflowsv1.Errors_ERRORS_ONBOARD_ENTITY_REJECTED.String(), workflowsv1.Errors_ERRORS_ONBOARD_ENTITY_REJECTED.String())
 	}
 	if state.Approval.Status != v1.ApprovalStatus_APPROVAL_STATUS_APPROVED {
 		logger.Info("Entity was either rejected or was not approved in time.")
-		return temporal.NewApplicationError(v1.Errors_ERRORS_ONBOARD_ENTITY_TIMED_OUT.String(), v1.Errors_ERRORS_ONBOARD_ENTITY_TIMED_OUT.String())
+		return temporal.NewApplicationError(workflowsv1.Errors_ERRORS_ONBOARD_ENTITY_TIMED_OUT.String(), workflowsv1.Errors_ERRORS_ONBOARD_ENTITY_TIMED_OUT.String())
 	}
 	// the rest of this is for approved onboardings
 	actCtx, _ := workflow.NewDisconnectedContext(ctx)
 	ao := workflow.WithActivityOptions(actCtx, workflow.ActivityOptions{StartToCloseTimeout: time.Second * 30})
-	if err := workflow.ExecuteActivity(ao, OnboardEntityActivities.RegisterCrmEntity, &v1.RegisterCrmEntityRequest{
+	if err := workflow.ExecuteActivity(ao, OnboardEntityActivities.RegisterCrmEntity, &commandsv1.RegisterCrmEntityRequest{
 		Id:    args.Id,
 		Value: args.Value,
 	}).Get(ctx, nil); err != nil {

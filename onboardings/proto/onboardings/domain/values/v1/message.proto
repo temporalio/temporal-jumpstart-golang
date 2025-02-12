@@ -1,6 +1,6 @@
 syntax = "proto3";
 
-package proto.onboardings.domain.v1.values;
+package onboardings.domain.values.v1;
 
 enum ApprovalStatus {
   APPROVAL_STATUS_UNSPECIFIED = 0;
@@ -10,6 +10,6 @@ enum ApprovalStatus {
 }
 
 message Approval {
-  proto.onboardings.domain.v1.values.ApprovalStatus status = 1;
+  onboardings.domain.values.v1.ApprovalStatus status = 1;
   string comment = 2;
 }

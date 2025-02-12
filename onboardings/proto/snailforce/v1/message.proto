@@ -1,6 +1,6 @@
 syntax = "proto3";
 
-package proto.snailforce.v1;
+package snailforce.v1;
 
 message RegisterRequest {
   string id = 1;
