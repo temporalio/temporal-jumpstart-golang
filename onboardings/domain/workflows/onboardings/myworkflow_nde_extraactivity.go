@@ -1,8 +1,8 @@
 package onboardings
 
 import (
-	"github.com/temporalio/temporal-jumpstart-golang/app/domain/scaffold/messages/commands"
-	"github.com/temporalio/temporal-jumpstart-golang/app/domain/scaffold/messages/workflows"
+	"github.com/temporalio/temporal-jumpstart-golang/onboardings/domain/scaffold/messages/commands"
+	"github.com/temporalio/temporal-jumpstart-golang/onboardings/domain/scaffold/messages/workflows"
 	"go.temporal.io/sdk/workflow"
 	"time"
 )

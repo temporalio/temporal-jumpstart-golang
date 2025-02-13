@@ -4,7 +4,7 @@ import (
 	"context"
 	"crypto/tls"
 	"fmt"
-	"github.com/temporalio/temporal-jumpstart-golang/app/config"
+	"github.com/temporalio/temporal-jumpstart-golang/onboardings/config"
 	"github.com/uber-go/tally/v4"
 	sdkclient "go.temporal.io/sdk/client"
 	sdktally "go.temporal.io/sdk/contrib/tally"

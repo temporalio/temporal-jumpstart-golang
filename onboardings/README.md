@@ -19,3 +19,23 @@ buf generate
 
 That will create a `onboardings/generated` directory with your messages
 compiled from the `onboardings/proto` directory.
+
+
+## Run The Applications
+
+_From the `onboardings`_ directory...
+
+```shell
+# start the Snailforce service
+go run cmd/snailforce/main.go
+```
+
+```shell
+# start the Onboardings API 
+go run cmd/api/main.go
+```
+
+```shell
+# start the Temporal Worker for the Onboardings Application
+go run cmd/worker/main.go
+```

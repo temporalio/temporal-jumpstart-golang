@@ -2,8 +2,8 @@ package clients
 
 import (
 	"context"
-	"github.com/temporalio/temporal-jumpstart-golang/app/clients/temporal"
-	"github.com/temporalio/temporal-jumpstart-golang/app/config"
+	"github.com/temporalio/temporal-jumpstart-golang/onboardings/clients/temporal"
+	"github.com/temporalio/temporal-jumpstart-golang/onboardings/config"
 	"go.temporal.io/sdk/client"
 )
 

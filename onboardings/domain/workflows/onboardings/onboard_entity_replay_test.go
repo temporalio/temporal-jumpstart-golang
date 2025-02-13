@@ -3,10 +3,10 @@ package onboardings
 import (
 	"context"
 	"github.com/stretchr/testify/suite"
-	"github.com/temporalio/temporal-jumpstart-golang/app/testhelper"
 	"github.com/temporalio/temporal-jumpstart-golang/onboardings/domain/workflows"
 	commandsv1 "github.com/temporalio/temporal-jumpstart-golang/onboardings/generated/onboardings/domain/commands/v1"
 	workflowsv1 "github.com/temporalio/temporal-jumpstart-golang/onboardings/generated/onboardings/domain/workflows/v1"
+	"github.com/temporalio/temporal-jumpstart-golang/onboardings/testhelper"
 	"go.temporal.io/sdk/client"
 	"go.temporal.io/sdk/testsuite"
 	"go.temporal.io/sdk/worker"

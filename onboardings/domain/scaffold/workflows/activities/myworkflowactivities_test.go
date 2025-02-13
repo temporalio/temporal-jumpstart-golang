@@ -2,9 +2,9 @@ package activities
 
 import (
 	"github.com/stretchr/testify/suite"
-	"github.com/temporalio/temporal-jumpstart-golang/app/domain/scaffold/messages/commands"
-	"github.com/temporalio/temporal-jumpstart-golang/app/domain/scaffold/messages/queries"
-	"github.com/temporalio/temporal-jumpstart-golang/app/testhelper"
+	"github.com/temporalio/temporal-jumpstart-golang/onboardings/domain/scaffold/messages/commands"
+	"github.com/temporalio/temporal-jumpstart-golang/onboardings/domain/scaffold/messages/queries"
+	"github.com/temporalio/temporal-jumpstart-golang/onboardings/testhelper"
 	"go.temporal.io/sdk/testsuite"
 	"reflect"
 	"testing"

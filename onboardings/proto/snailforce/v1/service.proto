@@ -3,6 +3,6 @@ import "snailforce/v1/message.proto";
 
 package snailforce.v1;
 
-service SnailForceService {
+service SnailforceService {
   rpc Register(v1.RegisterRequest) returns (v1.RegisterResponse);
 }

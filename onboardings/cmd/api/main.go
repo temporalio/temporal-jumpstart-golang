@@ -2,10 +2,9 @@ package main
 
 import (
 	"context"
-	"fmt"
-	"github.com/temporalio/temporal-jumpstart-golang/app/api"
-	appclients "github.com/temporalio/temporal-jumpstart-golang/app/clients"
-	"github.com/temporalio/temporal-jumpstart-golang/app/config"
+	"github.com/temporalio/temporal-jumpstart-golang/onboardings/api"
+	appclients "github.com/temporalio/temporal-jumpstart-golang/onboardings/api"
+	"github.com/temporalio/temporal-jumpstart-golang/onboardings/config"
 	"log"
 	"net/http"
 )
@@ -23,5 +22,5 @@ func main() {
 	if err != nil {
 		log.Fatal(err)
 	}
-	log.Fatal(http.ListenAndServe(fmt.Sprintf(":%s", cfg.API.Port), apiRouter))
+	log.Fatal(http.ListenAndServe(cfg.API.URL.Host, apiRouter))
 }

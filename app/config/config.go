@@ -71,7 +71,7 @@ type TemporalConfig struct {
 type APIConfig struct {
 	Port string
 	MTLS *MTLSConfig
-	URL  string
+	URL  *url.URL
 }
 
 func MustNewConfig() *Config {
@@ -130,7 +130,7 @@ func createApiCfg() (*APIConfig, error) {
 	return &APIConfig{
 		Port: parsedUrl.Port(),
 		MTLS: mtls,
-		URL:  parsedUrl.String(),
+		URL:  parsedUrl,
 	}, nil
 }
 

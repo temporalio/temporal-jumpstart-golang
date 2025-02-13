@@ -3,8 +3,8 @@ package myworkflow
 import (
 	"context"
 	"github.com/stretchr/testify/suite"
-	"github.com/temporalio/temporal-jumpstart-golang/app/domain/scaffold/messages/workflows"
-	"github.com/temporalio/temporal-jumpstart-golang/app/testhelper"
+	"github.com/temporalio/temporal-jumpstart-golang/onboardings/domain/scaffold/messages/workflows"
+	"github.com/temporalio/temporal-jumpstart-golang/onboardings/testhelper"
 	"go.temporal.io/sdk/client"
 	"go.temporal.io/sdk/testsuite"
 	"go.temporal.io/sdk/worker"

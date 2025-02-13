@@ -2,8 +2,8 @@ package activities
 
 import (
 	"context"
-	"github.com/temporalio/temporal-jumpstart-golang/app/domain/scaffold/messages/commands"
-	"github.com/temporalio/temporal-jumpstart-golang/app/domain/scaffold/messages/queries"
+	"github.com/temporalio/temporal-jumpstart-golang/onboardings/domain/scaffold/messages/commands"
+	"github.com/temporalio/temporal-jumpstart-golang/onboardings/domain/scaffold/messages/queries"
 )
 
 var TypeMyWorkflowActivities *MyWorkflowActivities

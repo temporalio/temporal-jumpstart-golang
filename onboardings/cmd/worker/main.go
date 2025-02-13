@@ -2,9 +2,9 @@ package main
 
 import (
 	"context"
-	appclients "github.com/temporalio/temporal-jumpstart-golang/app/clients"
-	"github.com/temporalio/temporal-jumpstart-golang/app/config"
-	temporalworker "github.com/temporalio/temporal-jumpstart-golang/app/workers/temporal"
+	appclients "github.com/temporalio/temporal-jumpstart-golang/onboardings/clients"
+	"github.com/temporalio/temporal-jumpstart-golang/onboardings/config"
+	temporalworker "github.com/temporalio/temporal-jumpstart-golang/onboardings/workers/temporal"
 	"go.temporal.io/sdk/worker"
 	"log"
 )

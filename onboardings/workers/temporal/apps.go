@@ -2,11 +2,14 @@ package temporal
 
 import (
 	"context"
-	"github.com/temporalio/temporal-jumpstart-golang/app/clients"
-	"github.com/temporalio/temporal-jumpstart-golang/app/config"
-	"github.com/temporalio/temporal-jumpstart-golang/app/domain/workflows"
+	"github.com/temporalio/temporal-jumpstart-golang/onboardings/clients"
+	"github.com/temporalio/temporal-jumpstart-golang/onboardings/config"
+	"github.com/temporalio/temporal-jumpstart-golang/onboardings/domain/workflows"
+	"github.com/temporalio/temporal-jumpstart-golang/onboardings/domain/workflows/onboardings"
+	"github.com/temporalio/temporal-jumpstart-golang/onboardings/generated/snailforce/v1/snailforcev1connect"
 	"go.temporal.io/sdk/contrib/resourcetuner"
 	"go.temporal.io/sdk/worker"
+	"net/http"
 )
 
 func NewAppsWorker(ctx context.Context, cfg *config.Config, clients *clients.Clients) (worker.Worker, error) {
@@ -40,7 +43,9 @@ func NewAppsWorker(ctx context.Context, cfg *config.Config, clients *clients.Cli
 	}
 
 	w := worker.New(clients.Temporal, cfg.Temporal.Worker.TaskQueue, opts)
-	registerComponents(ctx, cfg, clients, w)
+	if err := registerComponents(ctx, cfg, clients, w); err != nil {
+		return nil, err
+	}
 	return w, nil
 }
 
@@ -48,6 +53,10 @@ func registerComponents(ctx context.Context,
 	cfg *config.Config,
 	clients *clients.Clients,
 	worker worker.Worker) error {
+
+	snailforceClient := snailforcev1connect.NewSnailforceServiceClient(http.DefaultClient, cfg.Sn)
+	acts := &onboardings.Activities{}
 	worker.RegisterWorkflow(workflows.Ping)
+	worker.RegisterActivity(acts)
 	return nil
 }

@@ -1,7 +1,7 @@
 package queries
 
 import (
-	"github.com/temporalio/temporal-jumpstart-golang/app/domain/scaffold/messages/values"
+	"github.com/temporalio/temporal-jumpstart-golang/onboardings/domain/scaffold/messages/values"
 )
 
 type QueryActivityRequest struct {

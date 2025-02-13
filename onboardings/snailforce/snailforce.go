@@ -9,7 +9,7 @@ import (
 )
 
 type SnailforceService struct {
-	snailforcev1connect.UnimplementedSnailForceServiceHandler
+	snailforcev1connect.UnimplementedSnailforceServiceHandler
 }
 
 func (s *SnailforceService) Register(ctx context.Context, c *connect.Request[v1.RegisterRequest]) (*connect.Response[v1.RegisterResponse], error) {

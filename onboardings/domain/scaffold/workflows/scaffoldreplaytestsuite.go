@@ -3,7 +3,7 @@ package workflows
 import (
 	"context"
 	"github.com/stretchr/testify/suite"
-	"github.com/temporalio/temporal-jumpstart-golang/app/testhelper"
+	"github.com/temporalio/temporal-jumpstart-golang/onboardings/testhelper"
 	"go.temporal.io/sdk/client"
 	"go.temporal.io/sdk/testsuite"
 	"go.temporal.io/sdk/worker"
