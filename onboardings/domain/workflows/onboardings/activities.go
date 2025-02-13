@@ -10,12 +10,12 @@ var TypeOnboardActivities *Activities
 type Activities struct {
 }
 
-func (a *Activities) RegisterCrmEntity(ctx context.Context, q *commandscommandsv1.RegisterCrmEntityRequest) error {
+func (a *Activities) RegisterCrmEntity(ctx context.Context, q *commandsv1.RegisterCrmEntityRequest) error {
 	//TODO implement me
 	panic("implement me")
 }
 
-func (a *Activities) SendEmail(ctx context.Context, cmd *commandscommandsv1.RequestDeputyOwnerRequest) error {
+func (a *Activities) SendEmail(ctx context.Context, cmd *commandsv1.RequestDeputyOwnerRequest) error {
 	//TODO implement me
 	panic("implement me")
 }
