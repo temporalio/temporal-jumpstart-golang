@@ -3,9 +3,10 @@ package onboardings
 import (
 	workflows2 "github.com/temporalio/temporal-jumpstart-golang/onboardings/domain/workflows"
 	commandsv1 "github.com/temporalio/temporal-jumpstart-golang/onboardings/generated/onboardings/domain/commands/v1"
-	queriesv1 "github.com/temporalio/temporal-jumpstart-golang/onboardings/generated/onboardings/domain/queries/v1"
+	queriesv2 "github.com/temporalio/temporal-jumpstart-golang/onboardings/generated/onboardings/domain/queries/v2"
 	v1 "github.com/temporalio/temporal-jumpstart-golang/onboardings/generated/onboardings/domain/values/v1"
 	workflowsv1 "github.com/temporalio/temporal-jumpstart-golang/onboardings/generated/onboardings/domain/workflows/v1"
+	workflowsv2 "github.com/temporalio/temporal-jumpstart-golang/onboardings/generated/onboardings/domain/workflows/v2"
 	"go.temporal.io/sdk/log"
 	"go.temporal.io/sdk/temporal"
 	"go.temporal.io/sdk/workflow"
@@ -17,10 +18,10 @@ import (
 // In our scenario this is `V2`.
 // Previous versions, even when using "Patched" strategy, should be copied over in the file system to support
 // Replay testing. This allows no loading of history via JSON files and history can be piped in directly.
-func (workflows *Workflows) OnboardEntity(ctx workflow.Context, args *workflowsv1.OnboardEntityRequest) error {
+func (workflows *Workflows) OnboardEntity(ctx workflow.Context, args *workflowsv2.OnboardEntityRequest) error {
 
 	// 1. initialize state ASAP
-	state := &queriesv1.EntityOnboardingStateResponse{
+	state := &queriesv2.EntityOnboardingStateResponse{
 		Id:          args.Id,
 		SentRequest: args,
 		Approval: &v1.Approval{
@@ -29,20 +30,26 @@ func (workflows *Workflows) OnboardEntity(ctx workflow.Context, args *workflowsv
 		},
 		ApprovalTimeRemainingSeconds: args.GetCompletionTimeoutSeconds(),
 	}
+	calculator := onboardEntityDurationCalculator{
+		completionTimeoutSeconds: args.CompletionTimeoutSeconds,
+		skipApproval:             args.SkipApproval,
+		timestamp:                args.Timestamp.AsTime(),
+		hasDeputyOwner:           len(strings.TrimSpace(args.DeputyOwnerEmail)) > 0,
+	}
 
-	waitSeconds := calculateWaitSeconds(workflow.Now(ctx), args)
+	waitSeconds := calculator.calculateWaitSeconds(workflow.Now(ctx))
 	notifyDeputy := !args.SkipApproval && len(strings.TrimSpace(args.DeputyOwnerEmail)) > 0
 	logger := log.With(workflow.GetLogger(ctx), "waitSeconds", waitSeconds, "notifyDeputy", notifyDeputy)
 	logger.Info("Starting OnboardEntity")
 
 	// 2. configure reads
-	if err := workflow.SetQueryHandlerWithOptions(ctx, QueryEntityOnboardingState, func() (*queriesv1.EntityOnboardingStateResponse, error) {
+	if err := workflow.SetQueryHandlerWithOptions(ctx, QueryEntityOnboardingState, func() (*queriesv2.EntityOnboardingStateResponse, error) {
 		now := workflow.Now(ctx)
 		logger.Debug("Onboarding State", "now", now.String())
-		threshold := calculateCompletionThreshold(args)
+		threshold := calculator.calculateCompletionThreshold(workflow.Now(ctx))
 
 		timeRemaining := threshold.Sub(workflow.Now(ctx))
-		return &queriesv1.EntityOnboardingStateResponse{
+		return &queriesv2.EntityOnboardingStateResponse{
 			Id:                           state.Id,
 			SentRequest:                  args,
 			Approval:                     state.Approval,
@@ -55,10 +62,10 @@ func (workflows *Workflows) OnboardEntity(ctx workflow.Context, args *workflowsv
 	}
 
 	// 3. validate
-	if err := assertValidArgs(args); err != nil {
+	if err := assertValidArgsv2(args); err != nil {
 		return err
 	}
-	if calculateCompletionThreshold(args).Sub(workflow.Now(ctx)).Seconds() <= 0 {
+	if calculator.calculateCompletionThreshold(workflow.Now(ctx)).Sub(workflow.Now(ctx)).Seconds() <= 0 {
 		return temporal.NewApplicationError(workflowsv1.Errors_ERRORS_ONBOARD_ENTITY_TIMED_OUT.String(), workflowsv1.Errors_ERRORS_ONBOARD_ENTITY_TIMED_OUT.String())
 	}
 
@@ -111,7 +118,7 @@ func (workflows *Workflows) OnboardEntity(ctx workflow.Context, args *workflowsv
 			},
 		})
 
-		if err := workflow.ExecuteActivity(notificationCtx, TypeOnboardActivities.SendEmail, &commandsv1.RequestDeputyOwnerRequest{
+		if err := workflow.ExecuteActivity(notificationCtx, TypeOnboardingsActivities.SendEmail, &commandsv1.RequestDeputyOwnerRequest{
 			Id:               args.Id,
 			DeputyOwnerEmail: args.DeputyOwnerEmail,
 		}).Get(notificationCtx, nil); err != nil {

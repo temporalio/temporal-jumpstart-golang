@@ -27,7 +27,13 @@ func (workflows *Workflows) OnboardEntityV1(ctx workflow.Context, args *workflow
 		ApprovalTimeRemainingSeconds: args.GetCompletionTimeoutSeconds(),
 	}
 
-	waitSeconds := calculateWaitSeconds(workflow.Now(ctx), args)
+	calculator := &onboardEntityDurationCalculator{
+		completionTimeoutSeconds: args.CompletionTimeoutSeconds,
+		skipApproval:             args.SkipApproval,
+		timestamp:                args.Timestamp.AsTime(),
+		hasDeputyOwner:           len(strings.TrimSpace(args.DeputyOwnerEmail)) > 0,
+	}
+	waitSeconds := calculator.calculateWaitSeconds(workflow.Now(ctx))
 	notifyDeputy := !args.SkipApproval && len(strings.TrimSpace(args.DeputyOwnerEmail)) > 0
 	logger := log.With(workflow.GetLogger(ctx), "waitSeconds", waitSeconds, "notifyDeputy", notifyDeputy)
 	logger.Info("Starting OnboardEntity")
@@ -36,7 +42,7 @@ func (workflows *Workflows) OnboardEntityV1(ctx workflow.Context, args *workflow
 	if err := workflow.SetQueryHandlerWithOptions(ctx, QueryEntityOnboardingState, func() (*queriesv1.EntityOnboardingStateResponse, error) {
 		now := workflow.Now(ctx)
 		logger.Debug("Onboarding State", "now", now.String())
-		threshold := calculateCompletionThreshold(args)
+		threshold := calculator.calculateCompletionThreshold(workflow.Now(ctx))
 
 		timeRemaining := threshold.Sub(workflow.Now(ctx))
 		return &queriesv1.EntityOnboardingStateResponse{
@@ -52,10 +58,10 @@ func (workflows *Workflows) OnboardEntityV1(ctx workflow.Context, args *workflow
 	}
 
 	// 3. validate
-	if err := assertValidArgs(args); err != nil {
+	if err := assertValidArgsv1(args); err != nil {
 		return err
 	}
-	if calculateCompletionThreshold(args).Sub(workflow.Now(ctx)).Seconds() <= 0 {
+	if calculator.calculateCompletionThreshold(workflow.Now(ctx)).Sub(workflow.Now(ctx)).Seconds() <= 0 {
 		return temporal.NewApplicationError(workflowsv1.Errors_ERRORS_ONBOARD_ENTITY_TIMED_OUT.String(), workflowsv1.Errors_ERRORS_ONBOARD_ENTITY_TIMED_OUT.String())
 	}
 
@@ -104,7 +110,7 @@ func (workflows *Workflows) OnboardEntityV1(ctx workflow.Context, args *workflow
 				MaximumAttempts: 2,
 			},
 		})
-		if err := workflow.ExecuteActivity(notificationCtx, TypeOnboardActivities.SendEmail, &commandsv1.RequestDeputyOwnerRequest{
+		if err := workflow.ExecuteActivity(notificationCtx, TypeOnboardingsActivities.SendEmail, &commandsv1.RequestDeputyOwnerRequest{
 			Id:               args.Id,
 			DeputyOwnerEmail: args.DeputyOwnerEmail,
 		}).Get(notificationCtx, nil); err != nil {
@@ -130,13 +136,19 @@ func (workflows *Workflows) OnboardEntityV1(ctx workflow.Context, args *workflow
 		return temporal.NewApplicationError(workflowsv1.Errors_ERRORS_ONBOARD_ENTITY_TIMED_OUT.String(), workflowsv1.Errors_ERRORS_ONBOARD_ENTITY_TIMED_OUT.String())
 	}
 	// the rest of this is only despite approval status
-	ao := workflow.WithActivityOptions(ctx, workflow.ActivityOptions{StartToCloseTimeout: time.Second * 30})
-	if err := workflow.ExecuteActivity(ao, OnboardEntityActivities.RegisterCrmEntity, &commandsv1.RegisterCrmEntityRequest{
+	ao := workflow.WithActivityOptions(ctx, workflow.ActivityOptions{
+		StartToCloseTimeout: time.Second * 30,
+		RetryPolicy: &temporal.RetryPolicy{
+			MaximumAttempts: 2,
+		},
+	})
+	if err := workflow.ExecuteActivity(ao, TypeOnboardingsActivities.RegisterCrmEntity, &commandsv1.RegisterCrmEntityRequest{
 		Id:    args.Id,
 		Value: args.Value,
 	}).Get(ctx, nil); err != nil {
 		logger.Error("RegisterCrmEntity failed", "err", err)
 		return err
 	}
+	logger.Info("RegisterCrmEntity succeeded.")
 	return nil
 }

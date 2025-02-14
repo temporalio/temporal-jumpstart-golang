@@ -4,7 +4,6 @@ import (
 	"context"
 	"github.com/temporalio/temporal-jumpstart-golang/onboardings/clients"
 	"github.com/temporalio/temporal-jumpstart-golang/onboardings/config"
-	"github.com/temporalio/temporal-jumpstart-golang/onboardings/domain/workflows"
 	"github.com/temporalio/temporal-jumpstart-golang/onboardings/domain/workflows/onboardings"
 	"github.com/temporalio/temporal-jumpstart-golang/onboardings/generated/snailforce/v1/snailforcev1connect"
 	"go.temporal.io/sdk/contrib/resourcetuner"
@@ -43,20 +42,23 @@ func NewAppsWorker(ctx context.Context, cfg *config.Config, clients *clients.Cli
 	}
 
 	w := worker.New(clients.Temporal, cfg.Temporal.Worker.TaskQueue, opts)
-	if err := registerComponents(ctx, cfg, clients, w); err != nil {
+	if err := RegisterAppsComponents(ctx, cfg, clients, w); err != nil {
 		return nil, err
 	}
 	return w, nil
 }
 
-func registerComponents(ctx context.Context,
+func RegisterAppsComponents(ctx context.Context,
 	cfg *config.Config,
 	clients *clients.Clients,
 	worker worker.Worker) error {
 
-	snailforceClient := snailforcev1connect.NewSnailforceServiceClient(http.DefaultClient, cfg.Sn)
-	acts := &onboardings.Activities{}
-	worker.RegisterWorkflow(workflows.Ping)
+	snailforceClient := snailforcev1connect.NewSnailforceServiceClient(http.DefaultClient, cfg.Snailforce.URL.String())
+	acts, err := onboardings.NewOnboardingsActivities(snailforceClient)
+	if err != nil {
+		return err
+	}
+	worker.RegisterWorkflow(onboardings.TypeWorkflows.OnboardEntity)
 	worker.RegisterActivity(acts)
 	return nil
 }

@@ -202,11 +202,11 @@ func (s *OnboardEntityTestSuite) Test_GivenPendingApproval_OnboardShouldExposeTi
 		SkipApproval:             false,
 		Timestamp:                timestamppb.New(actualStartTime),
 	}
-	s.env.OnActivity(TypeOnboardActivities.RegisterCrmEntity, mock.Anything, &commandsv1.RegisterCrmEntityRequest{
+	s.env.OnActivity(TypeOnboardingsActivities.RegisterCrmEntity, mock.Anything, &commandsv1.RegisterCrmEntityRequest{
 		Id:    args.Id,
 		Value: args.Value,
 	}).Once().Return(nil)
-	s.env.OnActivity(TypeOnboardActivities.SendEmail, mock.Anything, &commandsv1.RequestDeputyOwnerRequest{
+	s.env.OnActivity(TypeOnboardingsActivities.SendEmail, mock.Anything, &commandsv1.RequestDeputyOwnerRequest{
 		Id:               args.Id,
 		DeputyOwnerEmail: args.DeputyOwnerEmail,
 	}).Never()
@@ -229,11 +229,11 @@ func (s *OnboardEntityTestSuite) Test_GivenApprovedNoDeputy_ShouldPerformOnboard
 		Timestamp:                timestamppb.New(time.Now()),
 	}
 	approval := &commandsv1.ApproveEntityRequest{Comment: testhelper.RandomString()}
-	s.env.OnActivity(TypeOnboardActivities.RegisterCrmEntity, mock.Anything, &commandsv1.RegisterCrmEntityRequest{
+	s.env.OnActivity(TypeOnboardingsActivities.RegisterCrmEntity, mock.Anything, &commandsv1.RegisterCrmEntityRequest{
 		Id:    args.Id,
 		Value: args.Value,
 	}).Once().Return(nil)
-	s.env.OnActivity(TypeOnboardActivities.SendEmail, mock.Anything, &commandsv1.RequestDeputyOwnerRequest{
+	s.env.OnActivity(TypeOnboardingsActivities.SendEmail, mock.Anything, &commandsv1.RequestDeputyOwnerRequest{
 		Id:               args.Id,
 		DeputyOwnerEmail: args.DeputyOwnerEmail,
 	}).Never()
@@ -259,8 +259,8 @@ func (s *OnboardEntityTestSuite) Test_GivenDeputyWithNoApprovalReceived_ShouldCo
 		SkipApproval:             false,
 		Timestamp:                timestamppb.New(time.Now()),
 	}
-	s.env.OnActivity(TypeOnboardActivities.RegisterCrmEntity, mock.Anything, mock.Anything).Never()
-	s.env.OnActivity(TypeOnboardActivities.SendEmail, mock.Anything, mock.Anything).Once().Return(nil)
+	s.env.OnActivity(TypeOnboardingsActivities.RegisterCrmEntity, mock.Anything, mock.Anything).Never()
+	s.env.OnActivity(TypeOnboardingsActivities.SendEmail, mock.Anything, mock.Anything).Once().Return(nil)
 
 	s.env.ExecuteWorkflow(TypeWorkflows.OnboardEntity, args)
 	s.True(s.env.IsWorkflowCompleted())
@@ -291,8 +291,8 @@ func (s *OnboardEntityTestSuite) Test_GivenDeputyWithNoApprovalReceived_ShouldRe
 		SkipApproval:             false,
 		Timestamp:                timestamppb.New(time.Now()),
 	}
-	s.env.OnActivity(TypeOnboardActivities.RegisterCrmEntity, mock.Anything, mock.Anything).Never()
-	s.env.OnActivity(TypeOnboardActivities.SendEmail, mock.Anything, &commandsv1.RequestDeputyOwnerRequest{
+	s.env.OnActivity(TypeOnboardingsActivities.RegisterCrmEntity, mock.Anything, mock.Anything).Never()
+	s.env.OnActivity(TypeOnboardingsActivities.SendEmail, mock.Anything, &commandsv1.RequestDeputyOwnerRequest{
 		Id:               args.Id,
 		DeputyOwnerEmail: args.DeputyOwnerEmail,
 	}).Once().Return(nil)
@@ -347,8 +347,8 @@ func (s *OnboardEntityTestSuite) Test_GivenRejection_ShouldNotPerformOnboardingT
 		Timestamp:                timestamppb.New(time.Now()),
 	}
 	rejection := &commandsv1.RejectEntityRequest{Comment: testhelper.RandomString()}
-	s.env.OnActivity(TypeOnboardActivities.RegisterCrmEntity, mock.Anything, mock.Anything).Never()
-	s.env.OnActivity(TypeOnboardActivities.SendEmail, mock.Anything, mock.Anything).Never()
+	s.env.OnActivity(TypeOnboardingsActivities.RegisterCrmEntity, mock.Anything, mock.Anything).Never()
+	s.env.OnActivity(TypeOnboardingsActivities.SendEmail, mock.Anything, mock.Anything).Never()
 	s.env.RegisterDelayedCallback(func() {
 		s.env.SignalWorkflow(workflows.SignalName(rejection), rejection)
 	}, time.Second*2)
@@ -390,8 +390,8 @@ func (s *OnboardEntityTestSuite) Test_GivenPending_ShouldNotPerformOnboardingTas
 		SkipApproval:             false,
 		Timestamp:                timestamppb.New(time.Now()),
 	}
-	s.env.OnActivity(TypeOnboardActivities.RegisterCrmEntity, mock.Anything, mock.Anything).Never()
-	s.env.OnActivity(TypeOnboardActivities.SendEmail, mock.Anything, mock.Anything).Never()
+	s.env.OnActivity(TypeOnboardingsActivities.RegisterCrmEntity, mock.Anything, mock.Anything).Never()
+	s.env.OnActivity(TypeOnboardingsActivities.SendEmail, mock.Anything, mock.Anything).Never()
 	s.env.RegisterDelayedCallback(func() {
 		s.env.CancelWorkflow()
 	}, time.Second*2)
@@ -414,11 +414,11 @@ func (s *OnboardEntityTestSuite) Test_WhenApproved_ShouldPerformOnboardingTasksT
 		Timestamp:                timestamppb.New(time.Now()),
 	}
 	approval := &commandsv1.ApproveEntityRequest{Comment: testhelper.RandomString()}
-	s.env.OnActivity(TypeOnboardActivities.RegisterCrmEntity, mock.Anything, &commandsv1.RegisterCrmEntityRequest{
+	s.env.OnActivity(TypeOnboardingsActivities.RegisterCrmEntity, mock.Anything, &commandsv1.RegisterCrmEntityRequest{
 		Id:    args.Id,
 		Value: args.Value,
 	}).Once().Return(nil)
-	s.env.OnActivity(TypeOnboardActivities.SendEmail, mock.Anything, &commandsv1.RequestDeputyOwnerRequest{
+	s.env.OnActivity(TypeOnboardingsActivities.SendEmail, mock.Anything, &commandsv1.RequestDeputyOwnerRequest{
 		Id:               args.Id,
 		DeputyOwnerEmail: args.DeputyOwnerEmail,
 	}).Never()

@@ -2,16 +2,19 @@ package onboardings
 
 import (
 	"context"
+	"fmt"
 	"github.com/stretchr/testify/suite"
 	"github.com/temporalio/temporal-jumpstart-golang/onboardings/domain/workflows"
 	commandsv1 "github.com/temporalio/temporal-jumpstart-golang/onboardings/generated/onboardings/domain/commands/v1"
 	workflowsv1 "github.com/temporalio/temporal-jumpstart-golang/onboardings/generated/onboardings/domain/workflows/v1"
+	"github.com/temporalio/temporal-jumpstart-golang/onboardings/generated/snailforce/v1/snailforcev1connect"
 	"github.com/temporalio/temporal-jumpstart-golang/onboardings/testhelper"
 	"go.temporal.io/sdk/client"
 	"go.temporal.io/sdk/testsuite"
 	"go.temporal.io/sdk/worker"
 	"go.temporal.io/sdk/workflow"
 	"google.golang.org/protobuf/types/known/timestamppb"
+	"net/http"
 	"testing"
 	"time"
 )
@@ -35,6 +38,7 @@ func (s *OnboardEntityReplayTestSuite) SetupSuite() {
 	s.taskQueue = testhelper.RandomString()
 	s.server = server
 	s.client = server.Client()
+
 	s.worker = worker.New(s.client, s.taskQueue, worker.Options{})
 	s.Require().NoError(s.worker.Start())
 }
@@ -63,7 +67,7 @@ func (s *OnboardEntityReplayTestSuite) Test_ReplayWithApproval_ExposesNDE() {
 	var historySource = TypeWorkflows.OnboardEntityV1
 	var historyTarget = TypeWorkflows.OnboardEntity
 
-	workflowTypeName, _ := testhelper.GetFunctionName(historySource)
+	workflowTypeName, _ := testhelper.GetFunctionName(historyTarget)
 
 	args := &workflowsv1.OnboardEntityRequest{
 		Id:                       testhelper.RandomString(),
@@ -75,7 +79,16 @@ func (s *OnboardEntityReplayTestSuite) Test_ReplayWithApproval_ExposesNDE() {
 
 	ctx := context.Background()
 
+	snailPort := testhelper.MustGetFreePort("localhost")
+	snailforceClient := snailforcev1connect.NewSnailforceServiceClient(http.DefaultClient, fmt.Sprintf("http://localhost:%d", snailPort))
+	acts, err := NewOnboardingsActivities(snailforceClient)
+	if err != nil {
+		s.Fail(err.Error())
+	}
+
 	s.worker.RegisterWorkflow(historySource)
+	s.worker.RegisterActivity(acts)
+
 	run, err := s.client.ExecuteWorkflow(ctx,
 		client.StartWorkflowOptions{
 			ID:        args.Id,
