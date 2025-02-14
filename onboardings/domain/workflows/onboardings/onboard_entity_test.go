@@ -265,7 +265,13 @@ func (s *OnboardEntityTestSuite) Test_GivenDeputyWithNoApprovalReceived_ShouldCo
 	s.env.ExecuteWorkflow(TypeWorkflows.OnboardEntity, args)
 	s.True(s.env.IsWorkflowCompleted())
 
-	expectCompletionTimeoutSeconds := args.CompletionTimeoutSeconds - calculateWaitSeconds(args.Timestamp.AsTime(), args)
+	calculator := onboardEntityDurationCalculator{
+		completionTimeoutSeconds: args.CompletionTimeoutSeconds,
+		skipApproval:             args.SkipApproval,
+		timestamp:                args.Timestamp.AsTime(),
+		hasDeputyOwner:           true,
+	}
+	expectCompletionTimeoutSeconds := args.CompletionTimeoutSeconds - calculator.calculateWaitSeconds(args.Timestamp.AsTime())
 	werr := s.env.GetWorkflowError()
 	// this shows how to test for a ContinueAsNew
 	can := &workflow.ContinueAsNewError{}
