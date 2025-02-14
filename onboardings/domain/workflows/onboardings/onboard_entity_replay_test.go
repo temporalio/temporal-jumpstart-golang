@@ -5,6 +5,7 @@ import (
 	"github.com/stretchr/testify/suite"
 	"github.com/temporalio/temporal-jumpstart-golang/onboardings/domain/workflows"
 	commandsv1 "github.com/temporalio/temporal-jumpstart-golang/onboardings/generated/onboardings/domain/commands/v1"
+	commandsv2 "github.com/temporalio/temporal-jumpstart-golang/onboardings/generated/onboardings/domain/commands/v2"
 	workflowsv1 "github.com/temporalio/temporal-jumpstart-golang/onboardings/generated/onboardings/domain/workflows/v1"
 	"github.com/temporalio/temporal-jumpstart-golang/onboardings/testhelper"
 	"go.temporal.io/sdk/client"
@@ -65,6 +66,10 @@ type activitiesDouble struct {
 	registerCrmEntityError error
 }
 
+func (a *activitiesDouble) NotifyOnboardEntityCompleted(ctx context.Context, cmd *commandsv2.NotifyOnboardEntityCompletedRequest) error {
+	return nil
+}
+
 func (a *activitiesDouble) RegisterCrmEntity(ctx context.Context, q *commandsv1.RegisterCrmEntityRequest) error {
 	if a.registerCrmEntityError != nil {
 		return a.registerCrmEntityError
@@ -72,7 +77,7 @@ func (a *activitiesDouble) RegisterCrmEntity(ctx context.Context, q *commandsv1.
 	return nil
 }
 
-func (a *activitiesDouble) SendEmail(ctx context.Context, cmd *commandsv1.RequestDeputyOwnerRequest) error {
+func (a *activitiesDouble) SendDeputyOwnerApprovalRequest(ctx context.Context, cmd *commandsv1.RequestDeputyOwnerRequest) error {
 	//TODO implement me
 	panic("implement me")
 }
@@ -81,7 +86,7 @@ func (s *OnboardEntityReplayTestSuite) Test_ReplayWithApproval_ExposesNDE() {
 	var historySource = TypeWorkflows.OnboardEntityV1
 	var historyTarget = TypeWorkflows.OnboardEntity
 
-	workflowTypeName, _ := testhelper.GetFunctionName(historyTarget)
+	workflowTypeName, _ := testhelper.GetFunctionName(historySource)
 
 	args := &workflowsv1.OnboardEntityRequest{
 		Id:                       testhelper.RandomString(),
@@ -126,7 +131,7 @@ func (s *OnboardEntityReplayTestSuite) Test_ReplayWithApproval_ExposesNDE() {
 	s.ErrorContains(replayer.ReplayWorkflowHistoryWithOptions(
 		nil,
 		history,
-		worker.ReplayWorkflowHistoryOptions{}), "nondeterministic workflow definition code")
+		worker.ReplayWorkflowHistoryOptions{}), "nondeterministic workflow")
 }
 
 func TestMyWorkflowReplay(t *testing.T) {

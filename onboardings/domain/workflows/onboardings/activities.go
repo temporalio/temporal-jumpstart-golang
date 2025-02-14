@@ -33,7 +33,7 @@ func (a *Activities) RegisterCrmEntity(ctx context.Context, q *commandsv1.Regist
 	return nil
 }
 
-func (a *Activities) SendEmail(ctx context.Context, cmd *commandsv1.RequestDeputyOwnerRequest) error {
+func (a *Activities) SendDeputyOwnerApprovalRequest(ctx context.Context, cmd *commandsv1.RequestDeputyOwnerRequest) error {
 	//TODO implement me
 	panic("implement me")
 }

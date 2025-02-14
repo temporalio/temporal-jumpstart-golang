@@ -110,7 +110,7 @@ func (workflows *Workflows) OnboardEntityV1(ctx workflow.Context, args *workflow
 				MaximumAttempts: 2,
 			},
 		})
-		if err := workflow.ExecuteActivity(notificationCtx, TypeOnboardingsActivities.SendEmail, &commandsv1.RequestDeputyOwnerRequest{
+		if err := workflow.ExecuteActivity(notificationCtx, TypeOnboardingsActivities.SendDeputyOwnerApprovalRequest, &commandsv1.RequestDeputyOwnerRequest{
 			Id:               args.Id,
 			DeputyOwnerEmail: args.DeputyOwnerEmail,
 		}).Get(notificationCtx, nil); err != nil {

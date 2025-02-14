@@ -3,6 +3,7 @@ package onboardings
 import (
 	workflows2 "github.com/temporalio/temporal-jumpstart-golang/onboardings/domain/workflows"
 	commandsv1 "github.com/temporalio/temporal-jumpstart-golang/onboardings/generated/onboardings/domain/commands/v1"
+	commandsv2 "github.com/temporalio/temporal-jumpstart-golang/onboardings/generated/onboardings/domain/commands/v2"
 	queriesv2 "github.com/temporalio/temporal-jumpstart-golang/onboardings/generated/onboardings/domain/queries/v2"
 	v1 "github.com/temporalio/temporal-jumpstart-golang/onboardings/generated/onboardings/domain/values/v1"
 	workflowsv1 "github.com/temporalio/temporal-jumpstart-golang/onboardings/generated/onboardings/domain/workflows/v1"
@@ -118,7 +119,7 @@ func (workflows *Workflows) OnboardEntity(ctx workflow.Context, args *workflowsv
 			},
 		})
 
-		if err := workflow.ExecuteActivity(notificationCtx, TypeOnboardingsActivities.SendEmail, &commandsv1.RequestDeputyOwnerRequest{
+		if err := workflow.ExecuteActivity(notificationCtx, TypeOnboardingsActivities.SendDeputyOwnerApprovalRequest, &commandsv1.RequestDeputyOwnerRequest{
 			Id:               args.Id,
 			DeputyOwnerEmail: args.DeputyOwnerEmail,
 		}).Get(notificationCtx, nil); err != nil {
@@ -157,12 +158,26 @@ func (workflows *Workflows) OnboardEntity(ctx workflow.Context, args *workflowsv
 	// the rest of this is for approved onboardings
 	actCtx, _ := workflow.NewDisconnectedContext(ctx)
 	ao := workflow.WithActivityOptions(actCtx, workflow.ActivityOptions{StartToCloseTimeout: time.Second * 30})
-	if err := workflow.ExecuteActivity(ao, OnboardEntityActivities.RegisterCrmEntity, &commandsv1.RegisterCrmEntityRequest{
+	if err = workflow.ExecuteActivity(ao, OnboardEntityActivities.RegisterCrmEntity, &commandsv1.RegisterCrmEntityRequest{
 		Id:    args.Id,
 		Value: args.Value,
-	}).Get(ctx, nil); err != nil {
+	}).Get(actCtx, nil); err != nil {
 		logger.Error("RegisterCrmEntity failed", "err", err)
 		return err
 	}
+	notificationCtx := workflow.WithActivityOptions(ctx, workflow.ActivityOptions{
+		StartToCloseTimeout: time.Second * 30,
+		RetryPolicy:         &temporal.RetryPolicy{MaximumAttempts: 2}})
+
+	if err = workflow.ExecuteActivity(notificationCtx, "NotifyOnboardEntityCompleted", &commandsv2.NotifyOnboardEntityCompletedRequest{
+		Id:       args.Id,
+		Email:    args.Email,
+		Value:    args.Value,
+		Approval: state.Approval,
+	}).Get(notificationCtx, nil); err != nil {
+		logger.Error("NotifyOnboardEntity failed", "err", err)
+		// notification failure will not fail the entire workflow
+	}
+
 	return nil
 }
