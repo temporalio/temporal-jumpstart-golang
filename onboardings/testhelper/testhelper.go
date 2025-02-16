@@ -11,6 +11,9 @@ import (
 	"reflect"
 )
 
+// NonDeterminismError https://github.com/temporalio/rules/blob/299fd78a45a5b342d9460cc2155ff4e50d1b2e96/rules/TMPRL1100.md
+const NonDeterminismError = "TMPRL1100"
+
 func RandomString() string {
 	return uuid.New().String()
 }

@@ -15,11 +15,11 @@ import (
 	"time"
 )
 
-// OnboardEntity is always the `latest` of this Application.
-// In our scenario this is `V2`.
+// OnboardEntityNDEExtraActivity is always the `latest` of this Application.
+// In our scenario this is `V2` logic without a patch.
 // Previous versions, even when using "Patched" strategy, should be copied over in the file system to support
 // Replay testing. This allows no loading of history via JSON files and history can be piped in directly.
-func (workflows *Workflows) OnboardEntity(ctx workflow.Context, args *workflowsv2.OnboardEntityRequest) error {
+func (workflows *Workflows) OnboardEntityNDEExtraActivity(ctx workflow.Context, args *workflowsv2.OnboardEntityRequest) error {
 
 	// 1. initialize state ASAP
 	state := &queriesv2.EntityOnboardingStateResponse{
@@ -169,10 +169,6 @@ func (workflows *Workflows) OnboardEntity(ctx workflow.Context, args *workflowsv
 		StartToCloseTimeout: time.Second * 30,
 		RetryPolicy:         &temporal.RetryPolicy{MaximumAttempts: 2}})
 
-	notifyVersion := workflow.GetVersion(ctx, "notifyOnboardEntityCompleted", workflow.DefaultVersion, 0)
-	if notifyVersion == workflow.DefaultVersion {
-		return nil
-	}
 	if err = workflow.ExecuteActivity(notificationCtx, "NotifyOnboardEntityCompleted", &commandsv2.NotifyOnboardEntityCompletedRequest{
 		Id:       args.Id,
 		Email:    args.Email,
