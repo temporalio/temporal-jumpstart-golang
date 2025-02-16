@@ -274,6 +274,8 @@ func (s *OnboardEntityTestSuite) Test_GivenDeputyWithNoApprovalReceived_ShouldCo
 	}
 	expectCompletionTimeoutSeconds := args.CompletionTimeoutSeconds - calculator.calculateWaitSeconds(args.Timestamp.AsTime())
 	werr := s.env.GetWorkflowError()
+	s.Error(werr)
+	s.T().Logf("werr: %s", werr)
 	// this shows how to test for a ContinueAsNew
 	can := &workflow.ContinueAsNewError{}
 	s.True(errors.As(werr, &can))

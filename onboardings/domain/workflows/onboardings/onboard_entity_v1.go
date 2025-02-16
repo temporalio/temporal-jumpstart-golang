@@ -26,13 +26,13 @@ func OnboardEntityV1(ctx workflow.Context, args *workflowsv1.OnboardEntityReques
 		},
 		ApprovalTimeRemainingSeconds: args.GetCompletionTimeoutSeconds(),
 	}
-
-	calculator := &onboardEntityDurationCalculator{
+	calculator := onboardEntityDurationCalculator{
 		completionTimeoutSeconds: args.CompletionTimeoutSeconds,
 		skipApproval:             args.SkipApproval,
 		timestamp:                args.Timestamp.AsTime(),
 		hasDeputyOwner:           len(strings.TrimSpace(args.DeputyOwnerEmail)) > 0,
 	}
+
 	waitSeconds := calculator.calculateWaitSeconds(workflow.Now(ctx))
 	notifyDeputy := !args.SkipApproval && len(strings.TrimSpace(args.DeputyOwnerEmail)) > 0
 	logger := log.With(workflow.GetLogger(ctx), "waitSeconds", waitSeconds, "notifyDeputy", notifyDeputy)
@@ -93,11 +93,14 @@ func OnboardEntityV1(ctx workflow.Context, args *workflowsv1.OnboardEntityReques
 
 	// 5. perform workflow behavior
 
-	conditionMet, _ := workflow.AwaitWithTimeout(ctx, time.Duration(waitSeconds)*time.Second, func() bool {
+	conditionMet, err := workflow.AwaitWithTimeout(ctx, time.Duration(waitSeconds)*time.Second, func() bool {
 		return state.Approval != nil && state.Approval.Status != valuesv1.ApprovalStatus_APPROVAL_STATUS_PENDING
 	})
 	// no longer eligible for approval while we figure out what to do next
 	cancelApprovalWindow()
+	if err = tryHandleCancellation(err); err != nil {
+		return err
+	}
 
 	if !conditionMet {
 		if !notifyDeputy {
@@ -110,6 +113,7 @@ func OnboardEntityV1(ctx workflow.Context, args *workflowsv1.OnboardEntityReques
 				MaximumAttempts: 2,
 			},
 		})
+
 		if err := workflow.ExecuteActivity(notificationCtx, TypeOnboardingsActivities.SendDeputyOwnerApprovalRequest, &commandsv1.RequestDeputyOwnerRequest{
 			Id:               args.Id,
 			DeputyOwnerEmail: args.DeputyOwnerEmail,
@@ -117,9 +121,20 @@ func OnboardEntityV1(ctx workflow.Context, args *workflowsv1.OnboardEntityReques
 			logger.Error("failed to notify deputy owner", "err", err)
 			return err
 		}
+
+		err = workflow.Await(ctx, func() bool {
+			// block until any buffered (late) messages might have come in
+			// But note this is somewhat redundant since we explicitly `cancelApprovalWindow` when
+			// we have not made progress in time.
+			return workflow.AllHandlersFinished(ctx)
+		})
+		if err = tryHandleCancellation(err); err != nil {
+			return err
+		}
+
 		// 1. send email to the deputy owner to request approval.
 		// 2. continue this workflow as new without the deputy owner email and reduce the amount of time we are willing to wait.
-		return workflow.NewContinueAsNewError(ctx, OnboardEntity, &workflowsv1.OnboardEntityRequest{
+		return workflow.NewContinueAsNewError(ctx, workflow.GetInfo(ctx).WorkflowType.Name, &workflowsv1.OnboardEntityRequest{
 			Id:                       args.Id,
 			Value:                    args.Value,
 			CompletionTimeoutSeconds: args.CompletionTimeoutSeconds - waitSeconds, // offset how long we will wait
@@ -135,20 +150,15 @@ func OnboardEntityV1(ctx workflow.Context, args *workflowsv1.OnboardEntityReques
 		logger.Info("Entity was either rejected or was not approved in time.")
 		return temporal.NewApplicationError(workflowsv1.Errors_ERRORS_ONBOARD_ENTITY_TIMED_OUT.String(), workflowsv1.Errors_ERRORS_ONBOARD_ENTITY_TIMED_OUT.String())
 	}
-	// the rest of this is only despite approval status
-	ao := workflow.WithActivityOptions(ctx, workflow.ActivityOptions{
-		StartToCloseTimeout: time.Second * 30,
-		RetryPolicy: &temporal.RetryPolicy{
-			MaximumAttempts: 2,
-		},
-	})
-	if err := workflow.ExecuteActivity(ao, TypeOnboardingsActivities.RegisterCrmEntity, &commandsv1.RegisterCrmEntityRequest{
+	// the rest of this is for approved onboardings
+	actCtx, _ := workflow.NewDisconnectedContext(ctx)
+	ao := workflow.WithActivityOptions(actCtx, workflow.ActivityOptions{StartToCloseTimeout: time.Second * 30})
+	if err = workflow.ExecuteActivity(ao, OnboardEntityActivities.RegisterCrmEntity, &commandsv1.RegisterCrmEntityRequest{
 		Id:    args.Id,
 		Value: args.Value,
-	}).Get(ctx, nil); err != nil {
+	}).Get(actCtx, nil); err != nil {
 		logger.Error("RegisterCrmEntity failed", "err", err)
 		return err
 	}
-	logger.Info("RegisterCrmEntity succeeded.")
 	return nil
 }

@@ -17,14 +17,32 @@ import (
 	"time"
 )
 
+type testWorker struct {
+	taskQueue string
+	worker.Worker
+}
+
+func (w *testWorker) Run(t *testing.T, runner func()) func() {
+	w.RegisterWorkflowWithOptions(OnboardEntityV1, workflow.RegisterOptions{Name: workflows.MustGetFunctionName(OnboardEntity)})
+	if err := w.Worker.Start(); err != nil {
+		t.Fatal(err)
+	}
+	runner()
+	return func() {
+		w.Worker.Stop()
+	}
+}
+
+type testWorkerFactory func(taskQueue string) *testWorker
+
 // OnboardEntityReplayTestSuite
 // https://docs.temporal.io/docs/go/testing/
 type OnboardEntityReplayTestSuite struct {
 	suite.Suite
-	taskQueue string
-	server    *testsuite.DevServer
-	client    client.Client
-	worker    worker.Worker
+	server              *testsuite.DevServer
+	client              client.Client
+	sutWorkflowTypeName string
+	workerFactory       testWorkerFactory
 }
 
 // SetupSuite https://pkg.go.dev/github.com/stretchr/testify/suite#SetupAllSuite
@@ -33,16 +51,22 @@ func (s *OnboardEntityReplayTestSuite) SetupSuite() {
 		LogLevel: "error",
 	})
 	s.Require().NoError(err)
-	s.taskQueue = testhelper.RandomString()
+
 	s.server = server
 	s.client = server.Client()
-
-	s.worker = worker.New(s.client, s.taskQueue, worker.Options{})
-	s.Require().NoError(s.worker.Start())
+	s.sutWorkflowTypeName, _ = testhelper.GetFunctionName(OnboardEntity)
+	s.workerFactory = func(taskQueue string) *testWorker {
+		w := worker.New(s.client, taskQueue, worker.Options{})
+		return &testWorker{
+			Worker:    w,
+			taskQueue: taskQueue,
+		}
+	}
 }
 
 // SetupTest https://pkg.go.dev/github.com/stretchr/testify/suite#SetupTestSuite
 func (s *OnboardEntityReplayTestSuite) SetupTest() {
+
 }
 
 // BeforeTest https://pkg.go.dev/github.com/stretchr/testify/suite#BeforeTest
@@ -54,8 +78,6 @@ func (s *OnboardEntityReplayTestSuite) BeforeTest(suiteName, testName string) {
 func (s *OnboardEntityReplayTestSuite) AfterTest(suiteName, testName string) {
 }
 func (s *OnboardEntityReplayTestSuite) TearDownSuite() {
-	s.worker.Stop()
-
 	err := s.server.Stop()
 	if err != nil {
 		s.Fail("Failed to stop server: %w", err)
@@ -82,11 +104,11 @@ func (a *activitiesDouble) SendDeputyOwnerApprovalRequest(ctx context.Context, c
 	panic("implement me")
 }
 
-func (s *OnboardEntityReplayTestSuite) Test_ReplayWithApproval_NoPatch_ExposesNDE() {
-	var historySource = OnboardEntityV1
+func (s *OnboardEntityReplayTestSuite) Test_OnboardEntityV1_ToV2_ReplayWithApproval_NoPatch_ExposesNDE() {
 	var historyTarget = OnboardEntityNDEExtraActivity
 
-	workflowTypeName, _ := testhelper.GetFunctionName(historySource)
+	var taskQueue = testhelper.RandomString()
+	w := s.workerFactory(taskQueue)
 
 	args := &workflowsv1.OnboardEntityRequest{
 		Id:                       testhelper.RandomString(),
@@ -100,45 +122,44 @@ func (s *OnboardEntityReplayTestSuite) Test_ReplayWithApproval_NoPatch_ExposesND
 
 	acts := &activitiesDouble{}
 
-	s.worker.RegisterWorkflow(historySource)
-	s.worker.RegisterActivity(acts)
+	w.RegisterActivity(acts)
 
-	run, err := s.client.ExecuteWorkflow(ctx,
-		client.StartWorkflowOptions{
-			ID:        args.Id,
-			TaskQueue: s.taskQueue,
-		},
-		historySource, args)
-	s.NoError(err)
-	time.Sleep(time.Second * 2)
-	var approval = &commandsv1.ApproveEntityRequest{Comment: testhelper.RandomString()}
-	s.NoError(s.client.SignalWorkflow(ctx, run.GetID(), "", workflows.SignalName(approval), approval))
-	// either wait for the WF to complete or give some time for the Task to reply back with events
-	s.NoError(run.Get(ctx, nil))
+	w.Run(s.T(), func() {
+		run, err := s.client.ExecuteWorkflow(ctx,
+			client.StartWorkflowOptions{
+				ID:        args.Id,
+				TaskQueue: taskQueue,
+			},
+			s.sutWorkflowTypeName, args)
+		s.NoError(err)
+		time.Sleep(time.Second * 2)
+		var approval = &commandsv1.ApproveEntityRequest{Comment: testhelper.RandomString()}
+		s.NoError(s.client.SignalWorkflow(ctx, run.GetID(), "", workflows.SignalName(approval), approval))
+		// either wait for the WF to complete or give some time for the Task to reply back with events
+		s.NoError(run.Get(ctx, nil))
 
-	s.T().Log("Workflow completed successfully")
+		s.T().Log("Workflow completed successfully")
 
-	// grab the WF history
-	history, err := testhelper.GetWorkflowHistory(ctx, s.client, args.Id)
+		// grab the WF history
+		history, err := testhelper.GetWorkflowHistory(ctx, s.client, args.Id)
 
-	// attempt replay
-	replayer := worker.NewWorkflowReplayer()
+		// attempt replay
+		replayer := worker.NewWorkflowReplayer()
 
-	// here we use the RegisterOptions to slip in our new implementation registered by the old name
-	replayer.RegisterWorkflowWithOptions(historyTarget,
-		workflow.RegisterOptions{Name: workflowTypeName})
+		// here we use the RegisterOptions to slip in our new implementation registered by the old name
+		replayer.RegisterWorkflowWithOptions(historyTarget,
+			workflow.RegisterOptions{Name: s.sutWorkflowTypeName})
 
-	s.ErrorContains(replayer.ReplayWorkflowHistoryWithOptions(
-		nil,
-		history,
-		worker.ReplayWorkflowHistoryOptions{}), testhelper.NonDeterminismError)
+		s.ErrorContains(replayer.ReplayWorkflowHistoryWithOptions(
+			nil,
+			history,
+			worker.ReplayWorkflowHistoryOptions{}), testhelper.NonDeterminismError)
+	})
+
 }
 
-func (s *OnboardEntityReplayTestSuite) Test_ReplayWithApproval_GivenPatched_DoesNotNDE() {
-	var historySource = OnboardEntityV1
+func (s *OnboardEntityReplayTestSuite) Test_OnboardEntityV1_ToV2_GivenPatched_DoesNotNDE() {
 	var historyTarget = OnboardEntity
-
-	workflowTypeName, _ := testhelper.GetFunctionName(historySource)
 
 	args := &workflowsv1.OnboardEntityRequest{
 		Id:                       testhelper.RandomString(),
@@ -150,40 +171,44 @@ func (s *OnboardEntityReplayTestSuite) Test_ReplayWithApproval_GivenPatched_Does
 
 	ctx := context.Background()
 
+	var taskQueue = testhelper.RandomString()
+	w := s.workerFactory(taskQueue)
+
 	acts := &activitiesDouble{}
 
-	s.worker.RegisterWorkflow(historySource)
-	s.worker.RegisterActivity(acts)
+	w.RegisterActivity(acts)
+	w.Run(s.T(), func() {
+		run, err := s.client.ExecuteWorkflow(ctx,
+			client.StartWorkflowOptions{
+				ID:        args.Id,
+				TaskQueue: taskQueue,
+			},
+			s.sutWorkflowTypeName, args)
+		s.NoError(err)
+		time.Sleep(time.Second * 2)
+		var approval = &commandsv1.ApproveEntityRequest{Comment: testhelper.RandomString()}
+		s.NoError(s.client.SignalWorkflow(ctx, run.GetID(), "", workflows.SignalName(approval), approval))
+		// either wait for the WF to complete or give some time for the Task to reply back with events
+		s.NoError(run.Get(ctx, nil))
 
-	run, err := s.client.ExecuteWorkflow(ctx,
-		client.StartWorkflowOptions{
-			ID:        args.Id,
-			TaskQueue: s.taskQueue,
-		},
-		historySource, args)
-	s.NoError(err)
-	time.Sleep(time.Second * 2)
-	var approval = &commandsv1.ApproveEntityRequest{Comment: testhelper.RandomString()}
-	s.NoError(s.client.SignalWorkflow(ctx, run.GetID(), "", workflows.SignalName(approval), approval))
-	// either wait for the WF to complete or give some time for the Task to reply back with events
-	s.NoError(run.Get(ctx, nil))
+		s.T().Log("Workflow completed successfully")
 
-	s.T().Log("Workflow completed successfully")
+		// grab the WF history
+		history, err := testhelper.GetWorkflowHistory(ctx, s.client, args.Id)
 
-	// grab the WF history
-	history, err := testhelper.GetWorkflowHistory(ctx, s.client, args.Id)
+		// attempt replay
+		replayer := worker.NewWorkflowReplayer()
 
-	// attempt replay
-	replayer := worker.NewWorkflowReplayer()
+		// here we use the RegisterOptions to slip in our new implementation registered by the old name
+		replayer.RegisterWorkflowWithOptions(historyTarget,
+			workflow.RegisterOptions{Name: s.sutWorkflowTypeName})
 
-	// here we use the RegisterOptions to slip in our new implementation registered by the old name
-	replayer.RegisterWorkflowWithOptions(historyTarget,
-		workflow.RegisterOptions{Name: workflowTypeName})
+		s.NoError(replayer.ReplayWorkflowHistoryWithOptions(
+			nil,
+			history,
+			worker.ReplayWorkflowHistoryOptions{}), testhelper.NonDeterminismError)
+	})
 
-	s.NoError(replayer.ReplayWorkflowHistoryWithOptions(
-		nil,
-		history,
-		worker.ReplayWorkflowHistoryOptions{}), testhelper.NonDeterminismError)
 }
 
 func TestMyWorkflowReplay(t *testing.T) {
