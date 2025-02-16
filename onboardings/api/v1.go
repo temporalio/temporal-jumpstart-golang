@@ -178,7 +178,7 @@ func createV1Router(ctx context.Context, deps *V1Dependencies, router *mux.Route
 			SkipApproval:             false,
 		}
 
-		wfRun, err := deps.Clients.Temporal.ExecuteWorkflow(r.Context(), options, onboardings.OnboardEntity, params)
+		wfRun, err := deps.Clients.Temporal.ExecuteWorkflow(r.Context(), options, onboardings.OnboardEntityV1, params)
 		if err != nil {
 			var alreadyStartedErr *serviceerror.WorkflowExecutionAlreadyStarted
 			if errors.As(err, &alreadyStartedErr) {

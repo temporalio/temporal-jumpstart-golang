@@ -24,12 +24,13 @@ import (
 type OnboardEntityTestSuite struct {
 	suite.Suite
 	testsuite.WorkflowTestSuite
-	env *testsuite.TestWorkflowEnvironment
+	env                 *testsuite.TestWorkflowEnvironment
+	sutWorkflowTypeName string
 }
 
 // SetupSuite https://pkg.go.dev/github.com/stretchr/testify/suite#SetupAllSuite
 func (s *OnboardEntityTestSuite) SetupSuite() {
-
+	s.sutWorkflowTypeName, _ = workflows.GetFunctionName(OnboardEntity)
 }
 
 // SetupTest https://pkg.go.dev/github.com/stretchr/testify/suite#SetupTestSuite
@@ -105,10 +106,10 @@ func (s *OnboardEntityTestSuite) Test_GivenInvalidArgs_ShouldFailTheWorkflow() {
 		s.Run(tc.name, func() {
 			// disregard the suite test environment for these
 			caseEnv := s.NewTestWorkflowEnvironment()
-			caseEnv.RegisterWorkflow(OnboardEntity)
+			caseEnv.RegisterWorkflowWithOptions(OnboardEntityV1, workflow.RegisterOptions{Name: s.sutWorkflowTypeName})
 			caseEnv.OnActivity(OnboardEntityActivities.RegisterCrmEntity, mock.Anything, mock.Anything).Never()
 			caseEnv.OnActivity(OnboardEntityActivities.SendDeputyOwnerApprovalRequest, mock.Anything, mock.Anything).Never()
-			caseEnv.ExecuteWorkflow(OnboardEntity, tc.args)
+			caseEnv.ExecuteWorkflow(s.sutWorkflowTypeName, tc.args)
 			s.True(caseEnv.IsWorkflowCompleted())
 			werr := caseEnv.GetWorkflowError()
 			s.NotNil(werr)
@@ -122,7 +123,7 @@ func (s *OnboardEntityTestSuite) Test_GivenInvalidArgs_ShouldFailTheWorkflow() {
 
 // [state]
 func (s *OnboardEntityTestSuite) Test_OnboardingThresholdHasAlreadyPassed() {
-	s.env.RegisterWorkflow(OnboardEntity)
+	s.env.RegisterWorkflowWithOptions(OnboardEntityV1, workflow.RegisterOptions{Name: s.sutWorkflowTypeName})
 	past := time.Now().AddDate(0, 0, -1)
 
 	args := &workflowsv1.OnboardEntityRequest{
@@ -135,7 +136,7 @@ func (s *OnboardEntityTestSuite) Test_OnboardingThresholdHasAlreadyPassed() {
 		Timestamp:                timestamppb.New(past),
 	}
 
-	s.env.ExecuteWorkflow(OnboardEntity, args)
+	s.env.ExecuteWorkflow(s.sutWorkflowTypeName, args)
 	s.True(s.env.IsWorkflowCompleted())
 	werr := s.env.GetWorkflowError()
 	s.NotNil(werr)
@@ -149,7 +150,7 @@ func (s *OnboardEntityTestSuite) Test_OnboardingThresholdHasAlreadyPassed() {
 
 // [behavior]
 func (s *OnboardEntityTestSuite) Test_GivenNeverApproved_DoesNotPerformOnboardingTasks() {
-	s.env.RegisterWorkflow(OnboardEntity)
+	s.env.RegisterWorkflowWithOptions(OnboardEntityV1, workflow.RegisterOptions{Name: s.sutWorkflowTypeName})
 	args := &workflowsv1.OnboardEntityRequest{
 		Id:                       testhelper.RandomString(),
 		Value:                    testhelper.RandomString(),
@@ -161,14 +162,14 @@ func (s *OnboardEntityTestSuite) Test_GivenNeverApproved_DoesNotPerformOnboardin
 	s.env.OnActivity(OnboardEntityActivities.RegisterCrmEntity, mock.Anything).Never()
 	s.env.OnActivity(OnboardEntityActivities.SendDeputyOwnerApprovalRequest, mock.Anything).Never()
 
-	s.env.ExecuteWorkflow(OnboardEntity, args)
+	s.env.ExecuteWorkflow(s.sutWorkflowTypeName, args)
 	s.True(s.env.IsWorkflowCompleted())
 	s.env.AssertExpectations(s.T())
 }
 
 // [state]
 func (s *OnboardEntityTestSuite) Test_GivenPendingApproval_OnboardShouldExposeTimeRemainingForApproval() {
-	s.env.RegisterWorkflow(OnboardEntity)
+	s.env.RegisterWorkflowWithOptions(OnboardEntityV1, workflow.RegisterOptions{Name: s.sutWorkflowTypeName})
 
 	// we want to complete this within 7 days
 	completionTimeoutSeconds := uint64((7 * 24 * time.Hour).Seconds())
@@ -211,7 +212,7 @@ func (s *OnboardEntityTestSuite) Test_GivenPendingApproval_OnboardShouldExposeTi
 		DeputyOwnerEmail: args.DeputyOwnerEmail,
 	}).Never()
 
-	s.env.ExecuteWorkflow(OnboardEntity, args)
+	s.env.ExecuteWorkflow(s.sutWorkflowTypeName, args)
 	s.True(s.env.IsWorkflowCompleted())
 	// check the expected approval time remaining overall but accommodate task timeout as reasonable drift
 	s.InDelta(int(expectApprovalTimeRemaining.Seconds()), int(actualState.GetApprovalTimeRemainingSeconds()), 10)
@@ -219,7 +220,7 @@ func (s *OnboardEntityTestSuite) Test_GivenPendingApproval_OnboardShouldExposeTi
 
 // [behavior]
 func (s *OnboardEntityTestSuite) Test_GivenApprovedNoDeputy_ShouldPerformOnboardingTasks() {
-	s.env.RegisterWorkflow(OnboardEntity)
+	s.env.RegisterWorkflowWithOptions(OnboardEntityV1, workflow.RegisterOptions{Name: s.sutWorkflowTypeName})
 	args := &workflowsv1.OnboardEntityRequest{
 		Id:                       testhelper.RandomString(),
 		Value:                    testhelper.RandomString(),
@@ -241,7 +242,7 @@ func (s *OnboardEntityTestSuite) Test_GivenApprovedNoDeputy_ShouldPerformOnboard
 		s.env.SignalWorkflow(workflows.SignalName(approval), approval)
 	}, time.Second*2)
 
-	s.env.ExecuteWorkflow(OnboardEntity, args)
+	s.env.ExecuteWorkflow(s.sutWorkflowTypeName, args)
 	s.True(s.env.IsWorkflowCompleted())
 	s.NoError(s.env.GetWorkflowError())
 
@@ -250,7 +251,7 @@ func (s *OnboardEntityTestSuite) Test_GivenApprovedNoDeputy_ShouldPerformOnboard
 
 // [state]: ContinueAsNew Test
 func (s *OnboardEntityTestSuite) Test_GivenDeputyWithNoApprovalReceived_ShouldContinueAsNewWithNewArgs() {
-	s.env.RegisterWorkflow(OnboardEntity)
+	s.env.RegisterWorkflowWithOptions(OnboardEntityV1, workflow.RegisterOptions{Name: s.sutWorkflowTypeName})
 	args := &workflowsv1.OnboardEntityRequest{
 		Id:                       testhelper.RandomString(),
 		Value:                    testhelper.RandomString(),
@@ -262,7 +263,7 @@ func (s *OnboardEntityTestSuite) Test_GivenDeputyWithNoApprovalReceived_ShouldCo
 	s.env.OnActivity(TypeOnboardingsActivities.RegisterCrmEntity, mock.Anything, mock.Anything).Never()
 	s.env.OnActivity(TypeOnboardingsActivities.SendDeputyOwnerApprovalRequest, mock.Anything, mock.Anything).Once().Return(nil)
 
-	s.env.ExecuteWorkflow(OnboardEntity, args)
+	s.env.ExecuteWorkflow(s.sutWorkflowTypeName, args)
 	s.True(s.env.IsWorkflowCompleted())
 
 	calculator := onboardEntityDurationCalculator{
@@ -276,8 +277,7 @@ func (s *OnboardEntityTestSuite) Test_GivenDeputyWithNoApprovalReceived_ShouldCo
 	// this shows how to test for a ContinueAsNew
 	can := &workflow.ContinueAsNewError{}
 	s.True(errors.As(werr, &can))
-	canWFType, _ := testhelper.GetFunctionName(OnboardEntity)
-	s.Equal(canWFType, can.WorkflowType.Name)
+	s.Equal(s.sutWorkflowTypeName, can.WorkflowType.Name)
 	canParams := &workflowsv1.OnboardEntityRequest{}
 	dc := converter.GetDefaultDataConverter()
 	s.NoError(dc.FromPayloads(can.Input, canParams))
@@ -288,7 +288,7 @@ func (s *OnboardEntityTestSuite) Test_GivenDeputyWithNoApprovalReceived_ShouldCo
 
 // [behavior]: ContinueAsNew Test
 func (s *OnboardEntityTestSuite) Test_GivenDeputyWithNoApprovalReceived_ShouldRequestDeputyApproval() {
-	s.env.RegisterWorkflow(OnboardEntity)
+	s.env.RegisterWorkflowWithOptions(OnboardEntityV1, workflow.RegisterOptions{Name: s.sutWorkflowTypeName})
 	args := &workflowsv1.OnboardEntityRequest{
 		Id:                       testhelper.RandomString(),
 		Value:                    testhelper.RandomString(),
@@ -303,7 +303,7 @@ func (s *OnboardEntityTestSuite) Test_GivenDeputyWithNoApprovalReceived_ShouldRe
 		DeputyOwnerEmail: args.DeputyOwnerEmail,
 	}).Once().Return(nil)
 
-	s.env.ExecuteWorkflow(OnboardEntity, args)
+	s.env.ExecuteWorkflow(s.sutWorkflowTypeName, args)
 	s.True(s.env.IsWorkflowCompleted())
 
 	s.env.AssertExpectations(s.T())
@@ -311,7 +311,7 @@ func (s *OnboardEntityTestSuite) Test_GivenDeputyWithNoApprovalReceived_ShouldRe
 
 // [state]
 func (s *OnboardEntityTestSuite) Test_GivenRejection_ShouldFailAndRevealRejectionComment() {
-	s.env.RegisterWorkflow(OnboardEntity)
+	s.env.RegisterWorkflowWithOptions(OnboardEntityV1, workflow.RegisterOptions{Name: s.sutWorkflowTypeName})
 	args := &workflowsv1.OnboardEntityRequest{
 		Id:                       testhelper.RandomString(),
 		Value:                    testhelper.RandomString(),
@@ -326,7 +326,7 @@ func (s *OnboardEntityTestSuite) Test_GivenRejection_ShouldFailAndRevealRejectio
 		s.env.SignalWorkflow(workflows.SignalName(rejection), rejection)
 	}, time.Second*2)
 
-	s.env.ExecuteWorkflow(OnboardEntity, args)
+	s.env.ExecuteWorkflow(s.sutWorkflowTypeName, args)
 	s.True(s.env.IsWorkflowCompleted())
 	werr := s.env.GetWorkflowError()
 	s.NotNil(werr)
@@ -343,7 +343,7 @@ func (s *OnboardEntityTestSuite) Test_GivenRejection_ShouldFailAndRevealRejectio
 
 // [behavior]
 func (s *OnboardEntityTestSuite) Test_GivenRejection_ShouldNotPerformOnboardingTasks() {
-	s.env.RegisterWorkflow(OnboardEntity)
+	s.env.RegisterWorkflowWithOptions(OnboardEntityV1, workflow.RegisterOptions{Name: s.sutWorkflowTypeName})
 	args := &workflowsv1.OnboardEntityRequest{
 		Id:                       testhelper.RandomString(),
 		Value:                    testhelper.RandomString(),
@@ -359,7 +359,7 @@ func (s *OnboardEntityTestSuite) Test_GivenRejection_ShouldNotPerformOnboardingT
 		s.env.SignalWorkflow(workflows.SignalName(rejection), rejection)
 	}, time.Second*2)
 
-	s.env.ExecuteWorkflow(OnboardEntity, args)
+	s.env.ExecuteWorkflow(s.sutWorkflowTypeName, args)
 	s.True(s.env.IsWorkflowCompleted())
 
 	s.env.AssertExpectations(s.T())
@@ -367,7 +367,7 @@ func (s *OnboardEntityTestSuite) Test_GivenRejection_ShouldNotPerformOnboardingT
 
 // [state]
 func (s *OnboardEntityTestSuite) Test_GivenPending_ShouldExitUponCancellation() {
-	s.env.RegisterWorkflow(OnboardEntity)
+	s.env.RegisterWorkflowWithOptions(OnboardEntityV1, workflow.RegisterOptions{Name: s.sutWorkflowTypeName})
 	args := &workflowsv1.OnboardEntityRequest{
 		Id:                       testhelper.RandomString(),
 		Value:                    testhelper.RandomString(),
@@ -380,14 +380,14 @@ func (s *OnboardEntityTestSuite) Test_GivenPending_ShouldExitUponCancellation() 
 		s.env.CancelWorkflow()
 	}, time.Second*2)
 
-	s.env.ExecuteWorkflow(OnboardEntity, args)
+	s.env.ExecuteWorkflow(s.sutWorkflowTypeName, args)
 	s.True(s.env.IsWorkflowCompleted())
 	s.True(temporal.IsCanceledError(s.env.GetWorkflowError()))
 }
 
 // [behavior]
 func (s *OnboardEntityTestSuite) Test_GivenPending_ShouldNotPerformOnboardingTasksWhenCancelled() {
-	s.env.RegisterWorkflow(OnboardEntity)
+	s.env.RegisterWorkflowWithOptions(OnboardEntityV1, workflow.RegisterOptions{Name: s.sutWorkflowTypeName})
 	args := &workflowsv1.OnboardEntityRequest{
 		Id:                       testhelper.RandomString(),
 		Value:                    testhelper.RandomString(),
@@ -402,7 +402,7 @@ func (s *OnboardEntityTestSuite) Test_GivenPending_ShouldNotPerformOnboardingTas
 		s.env.CancelWorkflow()
 	}, time.Second*2)
 
-	s.env.ExecuteWorkflow(OnboardEntity, args)
+	s.env.ExecuteWorkflow(s.sutWorkflowTypeName, args)
 	s.True(s.env.IsWorkflowCompleted())
 
 	s.env.AssertExpectations(s.T())
@@ -410,7 +410,7 @@ func (s *OnboardEntityTestSuite) Test_GivenPending_ShouldNotPerformOnboardingTas
 
 // [behavior]
 func (s *OnboardEntityTestSuite) Test_WhenApproved_ShouldPerformOnboardingTasksThoughCancelled() {
-	s.env.RegisterWorkflow(OnboardEntity)
+	s.env.RegisterWorkflowWithOptions(OnboardEntityV1, workflow.RegisterOptions{Name: s.sutWorkflowTypeName})
 	args := &workflowsv1.OnboardEntityRequest{
 		Id:                       testhelper.RandomString(),
 		Value:                    testhelper.RandomString(),
@@ -436,7 +436,7 @@ func (s *OnboardEntityTestSuite) Test_WhenApproved_ShouldPerformOnboardingTasksT
 		s.env.CancelWorkflow()
 	}, time.Second*2)
 
-	s.env.ExecuteWorkflow(OnboardEntity, args)
+	s.env.ExecuteWorkflow(s.sutWorkflowTypeName, args)
 	s.True(s.env.IsWorkflowCompleted())
 
 	s.env.AssertExpectations(s.T())

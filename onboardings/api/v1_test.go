@@ -111,7 +111,7 @@ func TestV1PutOnboardingStartsOnboardEntityWithCorrectParams(t *testing.T) {
 				opts.WorkflowExecutionErrorWhenAlreadyStarted == true
 		}), mock.MatchedBy(func(fn interface{}) bool {
 			funcName, _ := testhelper.GetFunctionName(fn)
-			return funcName == "OnboardEntity"
+			return funcName == "OnboardEntityV1"
 		}), mock.MatchedBy(func(params []interface{}) bool {
 			// check input argument to our Workflow
 			if len(params) != 1 {
