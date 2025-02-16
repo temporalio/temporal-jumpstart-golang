@@ -83,8 +83,8 @@ func (a *activitiesDouble) SendDeputyOwnerApprovalRequest(ctx context.Context, c
 }
 
 func (s *OnboardEntityReplayTestSuite) Test_ReplayWithApproval_NoPatch_ExposesNDE() {
-	var historySource = TypeWorkflows.OnboardEntityV1
-	var historyTarget = TypeWorkflows.OnboardEntityNDEExtraActivity
+	var historySource = OnboardEntityV1
+	var historyTarget = OnboardEntityNDEExtraActivity
 
 	workflowTypeName, _ := testhelper.GetFunctionName(historySource)
 
@@ -135,8 +135,8 @@ func (s *OnboardEntityReplayTestSuite) Test_ReplayWithApproval_NoPatch_ExposesND
 }
 
 func (s *OnboardEntityReplayTestSuite) Test_ReplayWithApproval_GivenPatched_DoesNotNDE() {
-	var historySource = TypeWorkflows.OnboardEntityV1
-	var historyTarget = TypeWorkflows.OnboardEntity
+	var historySource = OnboardEntityV1
+	var historyTarget = OnboardEntity
 
 	workflowTypeName, _ := testhelper.GetFunctionName(historySource)
 

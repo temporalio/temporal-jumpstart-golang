@@ -12,8 +12,10 @@ import (
 	"github.com/temporalio/temporal-jumpstart-golang/onboardings/clients"
 	"github.com/temporalio/temporal-jumpstart-golang/onboardings/config"
 	"github.com/temporalio/temporal-jumpstart-golang/onboardings/domain/workflows/onboardings"
-	apiv1 "github.com/temporalio/temporal-jumpstart-golang/onboardings/generated/api/v1"
-	domainv1 "github.com/temporalio/temporal-jumpstart-golang/onboardings/generated/domain/v1"
+	apiv1 "github.com/temporalio/temporal-jumpstart-golang/onboardings/generated/onboardings/api/v1"
+	queriesv1 "github.com/temporalio/temporal-jumpstart-golang/onboardings/generated/onboardings/domain/queries/v1"
+	valuesv1 "github.com/temporalio/temporal-jumpstart-golang/onboardings/generated/onboardings/domain/values/v1"
+	workflowsv1 "github.com/temporalio/temporal-jumpstart-golang/onboardings/generated/onboardings/domain/workflows/v1"
 	"github.com/temporalio/temporal-jumpstart-golang/onboardings/testhelper"
 	"go.temporal.io/api/enums/v1"
 	"go.temporal.io/api/serviceerror"
@@ -115,7 +117,7 @@ func TestV1PutOnboardingStartsOnboardEntityWithCorrectParams(t *testing.T) {
 			if len(params) != 1 {
 				return false
 			}
-			arg, ok := params[0].(*domainv1.OnboardEntityRequest)
+			arg, ok := params[0].(*workflowsv1.OnboardEntityRequest)
 			if !ok {
 				return false
 			}
@@ -152,17 +154,17 @@ func TestV1GetOnboardingState(t *testing.T) {
 			Worker: &config.TemporalWorker{TaskQueue: testhelper.RandomString()},
 		},
 	}
-	state := &domainv1.EntityOnboardingStateResponse{
+	state := &queriesv1.EntityOnboardingStateResponse{
 		Id: workflowId,
-		SentRequest: &domainv1.OnboardEntityRequest{
+		SentRequest: &workflowsv1.OnboardEntityRequest{
 			Id:                       workflowId,
 			Value:                    testhelper.RandomString(),
 			CompletionTimeoutSeconds: 0,
 			DeputyOwnerEmail:         "",
 			SkipApproval:             false,
 		},
-		Approval: &domainv1.Approval{
-			Status:  domainv1.ApprovalStatus_APPROVAL_STATUS_PENDING,
+		Approval: &valuesv1.Approval{
+			Status:  valuesv1.ApprovalStatus_APPROVAL_STATUS_PENDING,
 			Comment: "",
 		},
 	}
@@ -215,17 +217,17 @@ func TestV1GetGivenExistingOnboardingFetchesCurrentState(t *testing.T) {
 			Worker: &config.TemporalWorker{TaskQueue: testhelper.RandomString()},
 		},
 	}
-	state := &domainv1.EntityOnboardingStateResponse{
+	state := &queriesv1.EntityOnboardingStateResponse{
 		Id: workflowId,
-		SentRequest: &domainv1.OnboardEntityRequest{
+		SentRequest: &workflowsv1.OnboardEntityRequest{
 			Id:                       workflowId,
 			Value:                    testhelper.RandomString(),
 			CompletionTimeoutSeconds: 0,
 			DeputyOwnerEmail:         "",
 			SkipApproval:             false,
 		},
-		Approval: &domainv1.Approval{
-			Status:  domainv1.ApprovalStatus_APPROVAL_STATUS_PENDING,
+		Approval: &valuesv1.Approval{
+			Status:  valuesv1.ApprovalStatus_APPROVAL_STATUS_PENDING,
 			Comment: "",
 		},
 	}

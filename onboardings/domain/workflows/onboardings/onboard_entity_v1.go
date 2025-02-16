@@ -14,7 +14,7 @@ import (
 )
 
 // OnboardEntityV1 is the initial launch (v1) of this workflow
-func (workflows *Workflows) OnboardEntityV1(ctx workflow.Context, args *workflowsv1.OnboardEntityRequest) error {
+func OnboardEntityV1(ctx workflow.Context, args *workflowsv1.OnboardEntityRequest) error {
 
 	// 1. initialize state ASAP
 	state := &queriesv1.EntityOnboardingStateResponse{
@@ -119,7 +119,7 @@ func (workflows *Workflows) OnboardEntityV1(ctx workflow.Context, args *workflow
 		}
 		// 1. send email to the deputy owner to request approval.
 		// 2. continue this workflow as new without the deputy owner email and reduce the amount of time we are willing to wait.
-		return workflow.NewContinueAsNewError(ctx, TypeWorkflows.OnboardEntity, &workflowsv1.OnboardEntityRequest{
+		return workflow.NewContinueAsNewError(ctx, OnboardEntity, &workflowsv1.OnboardEntityRequest{
 			Id:                       args.Id,
 			Value:                    args.Value,
 			CompletionTimeoutSeconds: args.CompletionTimeoutSeconds - waitSeconds, // offset how long we will wait

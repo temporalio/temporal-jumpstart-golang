@@ -19,7 +19,7 @@ import (
 // In our scenario this is `V2`.
 // Previous versions, even when using "Patched" strategy, should be copied over in the file system to support
 // Replay testing. This allows no loading of history via JSON files and history can be piped in directly.
-func (workflows *Workflows) OnboardEntity(ctx workflow.Context, args *workflowsv2.OnboardEntityRequest) error {
+func OnboardEntity(ctx workflow.Context, args *workflowsv2.OnboardEntityRequest) error {
 
 	// 1. initialize state ASAP
 	state := &queriesv2.EntityOnboardingStateResponse{
@@ -139,7 +139,7 @@ func (workflows *Workflows) OnboardEntity(ctx workflow.Context, args *workflowsv
 
 		// 1. send email to the deputy owner to request approval.
 		// 2. continue this workflow as new without the deputy owner email and reduce the amount of time we are willing to wait.
-		return workflow.NewContinueAsNewError(ctx, TypeWorkflows.OnboardEntity, &workflowsv1.OnboardEntityRequest{
+		return workflow.NewContinueAsNewError(ctx, OnboardEntity, &workflowsv1.OnboardEntityRequest{
 			Id:                       args.Id,
 			Value:                    args.Value,
 			CompletionTimeoutSeconds: args.CompletionTimeoutSeconds - waitSeconds, // offset how long we will wait

@@ -7,8 +7,6 @@ import (
 	"time"
 )
 
-var TypeWorkflows *Workflows
-
 const QueryEntityOnboardingState = "entityOnboardingState"
 
 // DefaultCompletionTimeoutSeconds specs say to wait 7 days before giving up
@@ -21,5 +19,3 @@ type OnboardEntityActivities interface {
 type OnboardEntityNotificationActivities interface {
 	NotifyOnboardEntityCompleted(ctx context.Context, cmd *commandsv2.NotifyOnboardEntityCompletedRequest) error
 }
-
-type Workflows struct{}

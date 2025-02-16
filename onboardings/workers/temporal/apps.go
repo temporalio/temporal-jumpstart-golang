@@ -58,7 +58,7 @@ func RegisterAppsComponents(ctx context.Context,
 	if err != nil {
 		return err
 	}
-	worker.RegisterWorkflow(onboardings.TypeWorkflows.OnboardEntity)
+	worker.RegisterWorkflow(onboardings.OnboardEntity)
 	worker.RegisterActivity(acts)
 	return nil
 }

@@ -10,8 +10,9 @@ import (
 	"github.com/temporalio/temporal-jumpstart-golang/onboardings/config"
 	"github.com/temporalio/temporal-jumpstart-golang/onboardings/domain/workflows"
 	"github.com/temporalio/temporal-jumpstart-golang/onboardings/domain/workflows/onboardings"
-	apiv1 "github.com/temporalio/temporal-jumpstart-golang/onboardings/generated/api/v1"
-	domainv1 "github.com/temporalio/temporal-jumpstart-golang/onboardings/generated/domain/v1"
+	apiv1 "github.com/temporalio/temporal-jumpstart-golang/onboardings/generated/onboardings/api/v1"
+	queriesv1 "github.com/temporalio/temporal-jumpstart-golang/onboardings/generated/onboardings/domain/queries/v1"
+	workflowsv1 "github.com/temporalio/temporal-jumpstart-golang/onboardings/generated/onboardings/domain/workflows/v1"
 	"go.temporal.io/api/enums/v1"
 	"go.temporal.io/api/serviceerror"
 	"log"
@@ -76,7 +77,7 @@ func createV1Router(ctx context.Context, deps *V1Dependencies, router *mux.Route
 			TaskQueue: deps.Config.Temporal.Worker.TaskQueue,
 			// This configures how to deal with prior attempts of an Onboarding.
 			// We want to allow a "do over" of the Onboarding only if the prior attempts failed.
-			WorkflowIDReusePolicy: enums.W,
+			WorkflowIDReusePolicy: enums.WORKFLOW_ID_REUSE_POLICY_ALLOW_DUPLICATE_FAILED_ONLY,
 			// This configures how to deal with any Running Onboarding currently in progress.
 			// We want to fail if already in flight.
 			WorkflowIDConflictPolicy: enums.WORKFLOW_ID_CONFLICT_POLICY_FAIL,
@@ -132,7 +133,7 @@ func createV1Router(ctx context.Context, deps *V1Dependencies, router *mux.Route
 			http.Error(w, "Internal Server Error", http.StatusInternalServerError)
 			return
 		}
-		var queryResult *domainv1.EntityOnboardingStateResponse
+		var queryResult *queriesv1.EntityOnboardingStateResponse
 		if err := result.Get(&queryResult); err != nil {
 			log.Printf("Error getting workflow queryResult: %v", err)
 			http.Error(w, "Internal Server Error", http.StatusInternalServerError)
@@ -169,7 +170,7 @@ func createV1Router(ctx context.Context, deps *V1Dependencies, router *mux.Route
 			WorkflowExecutionErrorWhenAlreadyStarted: true,
 		}
 
-		params := &domainv1.OnboardEntityRequest{
+		params := &workflowsv1.OnboardEntityRequest{
 			Id:                       workflowId,
 			Value:                    body.Value,
 			CompletionTimeoutSeconds: 0,
@@ -177,7 +178,7 @@ func createV1Router(ctx context.Context, deps *V1Dependencies, router *mux.Route
 			SkipApproval:             false,
 		}
 
-		wfRun, err := deps.Clients.Temporal.ExecuteWorkflow(r.Context(), options, onboardings.TypeWorkflows.OnboardEntity, params)
+		wfRun, err := deps.Clients.Temporal.ExecuteWorkflow(r.Context(), options, onboardings.OnboardEntity, params)
 		if err != nil {
 			var alreadyStartedErr *serviceerror.WorkflowExecutionAlreadyStarted
 			if errors.As(err, &alreadyStartedErr) {
