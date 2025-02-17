@@ -90,6 +90,67 @@ func TestV1StartOnboardingAcceptsTheRequestAndReturnsOnboardingLocation(t *testi
 }
 
 // resource behavior test
+func TestV1PutApprovalParamsSignalsRelatedOnboarding(t *testing.T) {
+	A := assert.New(t)
+	ctx := context.Background()
+	workflowId := testhelper.RandomString()
+	body := &apiv1.ApprovalsPut{
+		Id: workflowId,
+		Approval: &valuesv1.Approval{
+			Status:  valuesv1.ApprovalStatus_APPROVAL_STATUS_APPROVED,
+			Comment: testhelper.RandomString(),
+		},
+	}
+	cfg := &config.Config{
+		Temporal: &config.TemporalConfig{
+			Worker: &config.TemporalWorker{TaskQueue: testhelper.RandomString()},
+		},
+	}
+	temporalClient := &testhelper.MockTemporalClient{}
+	temporalClient.On("ExecuteWorkflow", mock.Anything,
+		mock.MatchedBy(func(opts client.StartWorkflowOptions) bool {
+			// check the workflow options we are configuring
+			return opts.ID == workflowId &&
+				opts.TaskQueue == cfg.Temporal.Worker.TaskQueue &&
+				opts.WorkflowIDReusePolicy == enums.WORKFLOW_ID_REUSE_POLICY_ALLOW_DUPLICATE_FAILED_ONLY &&
+				opts.WorkflowIDConflictPolicy == enums.WORKFLOW_ID_CONFLICT_POLICY_FAIL &&
+				opts.WorkflowExecutionErrorWhenAlreadyStarted == true
+		}), mock.MatchedBy(func(fn interface{}) bool {
+			funcName, _ := testhelper.GetFunctionName(fn)
+			return funcName == "OnboardEntityV1"
+		}), mock.MatchedBy(func(params []interface{}) bool {
+			// check input argument to our Workflow
+			if len(params) != 1 {
+				return false
+			}
+			arg, ok := params[0].(*workflowsv1.OnboardEntityRequest)
+			if !ok {
+				return false
+			}
+			return arg.Value == body.GetValue() && arg.Id == workflowId
+		})).Once().Return(&TestWorkflowRun{id: workflowId}, nil)
+	c := &clients.Clients{Temporal: temporalClient}
+	sut := createV1Router(ctx, &V1Dependencies{
+		Clients: c,
+		Config:  cfg,
+	}, mux.NewRouter())
+	testserver := httptest.NewServer(sut)
+	defer testserver.Close()
+	jsonBody, err := json.Marshal(&body)
+	A.NoError(err)
+	parsedUrl, err := url.Parse(testserver.URL + "/onboardings/" + workflowId)
+	A.NoError(err)
+	req, err := http.NewRequest("PUT", parsedUrl.String(), bytes.NewReader(jsonBody))
+	A.NoError(err)
+	req.Header.Add("Content-Type", "application/json")
+	req.Header.Add("Host", testserver.URL)
+	_, err = testserver.Client().Do(req)
+	A.NoError(err)
+
+	temporalClient.AssertExpectations(t)
+}
+
+// resource behavior test
 func TestV1PutOnboardingStartsOnboardEntityWithCorrectParams(t *testing.T) {
 	A := assert.New(t)
 	ctx := context.Background()

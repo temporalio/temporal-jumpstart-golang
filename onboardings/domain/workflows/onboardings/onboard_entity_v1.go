@@ -1,6 +1,7 @@
 package onboardings
 
 import (
+	"fmt"
 	workflows2 "github.com/temporalio/temporal-jumpstart-golang/onboardings/domain/workflows"
 	commandsv1 "github.com/temporalio/temporal-jumpstart-golang/onboardings/generated/onboardings/domain/commands/v1"
 	queriesv1 "github.com/temporalio/temporal-jumpstart-golang/onboardings/generated/onboardings/domain/queries/v1"
@@ -65,31 +66,77 @@ func OnboardEntityV1(ctx workflow.Context, args *workflowsv1.OnboardEntityReques
 		return temporal.NewApplicationError(workflowsv1.Errors_ERRORS_ONBOARD_ENTITY_TIMED_OUT.String(), workflowsv1.Errors_ERRORS_ONBOARD_ENTITY_TIMED_OUT.String())
 	}
 
-	// 4. configure write handlers
 	approvalCtx, cancelApprovalWindow := workflow.WithCancel(ctx)
-	approvalChan := workflow.GetSignalChannel(approvalCtx, workflows2.SignalName(&commandsv1.ApproveEntityRequest{}))
-	rejectChan := workflow.GetSignalChannel(approvalCtx, workflows2.SignalName(&commandsv1.RejectEntityRequest{}))
-
-	approvalsSelector := workflow.NewNamedSelector(approvalCtx, "approvals")
-	workflow.GoNamed(ctx, "approvals", func(ctx workflow.Context) {
-		approvalsSelector.AddReceive(approvalChan, func(c workflow.ReceiveChannel, more bool) {
-			var approval *commandsv1.ApproveEntityRequest
-			approvalChan.Receive(ctx, &approval)
+	if err := workflow.SetUpdateHandlerWithOptions(
+		approvalCtx,
+		workflows2.UpdateName(&commandsv1.ApproveEntityRequest{}),
+		func(ctx workflow.Context, cmd *commandsv1.ApproveEntityRequest) error {
 			state.Approval = &valuesv1.Approval{
 				Status:  valuesv1.ApprovalStatus_APPROVAL_STATUS_APPROVED,
-				Comment: approval.GetComment(),
+				Comment: cmd.GetComment(),
 			}
-		})
-		approvalsSelector.AddReceive(rejectChan, func(c workflow.ReceiveChannel, more bool) {
-			var rejection *commandsv1.RejectEntityRequest
-			rejectChan.Receive(ctx, &rejection)
+			return nil
+		},
+		workflow.UpdateHandlerOptions{
+			Description: "Approve Entity Onboarding",
+			Validator: func(ctx workflow.Context, cmd *commandsv1.ApproveEntityRequest) error {
+				if state.Approval == nil || (state.Approval.Status == valuesv1.ApprovalStatus_APPROVAL_STATUS_PENDING ||
+					state.Approval.Status == valuesv1.ApprovalStatus_APPROVAL_STATUS_UNSPECIFIED) {
+					return nil
+				}
+				return fmt.Errorf("Onboarding Approval or Rejection has already been completed: %v", state.Approval.Status)
+			},
+		}); err != nil {
+		return err
+	}
+	if err := workflow.SetUpdateHandlerWithOptions(
+		approvalCtx,
+		workflows2.UpdateName(&commandsv1.RejectEntityRequest{}),
+		func(ctx workflow.Context, cmd *commandsv1.RejectEntityRequest) error {
 			state.Approval = &valuesv1.Approval{
 				Status:  valuesv1.ApprovalStatus_APPROVAL_STATUS_REJECTED,
-				Comment: rejection.GetComment(),
+				Comment: cmd.GetComment(),
 			}
-		})
-		approvalsSelector.Select(ctx)
-	})
+			return nil
+		},
+		workflow.UpdateHandlerOptions{
+			Description: "Reject Entity Onboarding",
+			Validator: func(ctx workflow.Context, cmd *commandsv1.RejectEntityRequest) error {
+				if state.Approval == nil || (state.Approval.Status == valuesv1.ApprovalStatus_APPROVAL_STATUS_PENDING ||
+					state.Approval.Status == valuesv1.ApprovalStatus_APPROVAL_STATUS_UNSPECIFIED) {
+					return nil
+				}
+				return fmt.Errorf("Onboarding Approval or Rejection has already been completed: %v", state.Approval.Status)
+			},
+		}); err != nil {
+		return err
+	}
+
+	// 4. configure write handlers
+	//approvalCtx, cancelApprovalWindow := workflow.WithCancel(ctx)
+	//approvalChan := workflow.GetSignalChannel(approvalCtx, workflows2.SignalName(&commandsv1.ApproveEntityRequest{}))
+	//rejectChan := workflow.GetSignalChannel(approvalCtx, workflows2.SignalName(&commandsv1.RejectEntityRequest{}))
+	//
+	//approvalsSelector := workflow.NewNamedSelector(approvalCtx, "approvals")
+	//workflow.GoNamed(ctx, "approvals", func(ctx workflow.Context) {
+	//	approvalsSelector.AddReceive(approvalChan, func(c workflow.ReceiveChannel, more bool) {
+	//		var approval *commandsv1.ApproveEntityRequest
+	//		approvalChan.Receive(ctx, &approval)
+	//		state.Approval = &valuesv1.Approval{
+	//			Status:  valuesv1.ApprovalStatus_APPROVAL_STATUS_APPROVED,
+	//			Comment: approval.GetComment(),
+	//		}
+	//	})
+	//	approvalsSelector.AddReceive(rejectChan, func(c workflow.ReceiveChannel, more bool) {
+	//		var rejection *commandsv1.RejectEntityRequest
+	//		rejectChan.Receive(ctx, &rejection)
+	//		state.Approval = &valuesv1.Approval{
+	//			Status:  valuesv1.ApprovalStatus_APPROVAL_STATUS_REJECTED,
+	//			Comment: rejection.GetComment(),
+	//		}
+	//	})
+	//	approvalsSelector.Select(ctx)
+	//})
 
 	// 5. perform workflow behavior
 

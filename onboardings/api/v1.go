@@ -178,7 +178,7 @@ func createV1Router(ctx context.Context, deps *V1Dependencies, router *mux.Route
 			SkipApproval:             false,
 		}
 
-		wfRun, err := deps.Clients.Temporal.ExecuteWorkflow(r.Context(), options, onboardings.OnboardEntityV1, params)
+		_, err := deps.Clients.Temporal.ExecuteWorkflow(r.Context(), options, onboardings.TypeWorkflowOnboardEntity, params)
 		if err != nil {
 			var alreadyStartedErr *serviceerror.WorkflowExecutionAlreadyStarted
 			if errors.As(err, &alreadyStartedErr) {
@@ -186,7 +186,7 @@ func createV1Router(ctx context.Context, deps *V1Dependencies, router *mux.Route
 				return
 			}
 
-			log.Printf("Failed to execute workflow '%s': %v", wfRun.GetID(), err)
+			log.Printf("Failed to execute workflow '%s': %v", workflowId, err)
 			http.Error(w, "Internal Server Error", http.StatusInternalServerError)
 			return
 		}

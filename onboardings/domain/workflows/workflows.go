@@ -13,6 +13,12 @@ func SignalName(m proto.Message) string {
 	}
 	return string(m.ProtoReflect().Descriptor().FullName())
 }
+func UpdateName(m proto.Message) string {
+	if m == nil {
+		return ""
+	}
+	return string(m.ProtoReflect().Descriptor().FullName())
+}
 func QueryName(m proto.Message) string {
 	if m == nil {
 		return ""

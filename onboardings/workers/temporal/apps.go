@@ -8,6 +8,7 @@ import (
 	"github.com/temporalio/temporal-jumpstart-golang/onboardings/domain/workflows/onboardings"
 	"go.temporal.io/sdk/contrib/resourcetuner"
 	"go.temporal.io/sdk/worker"
+	"go.temporal.io/sdk/workflow"
 )
 
 func NewAppsWorker(ctx context.Context, cfg *config.Config, clients *clients.Clients) (worker.Worker, error) {
@@ -60,7 +61,8 @@ func RegisterAppsComponents(ctx context.Context,
 	if err != nil {
 		return err
 	}
-	worker.RegisterWorkflow(onboardings.OnboardEntity)
+	worker.RegisterWorkflowWithOptions(onboardings.OnboardEntityV1,
+		workflow.RegisterOptions{Name: onboardings.TypeWorkflowOnboardEntity})
 	worker.RegisterActivity(acts)
 	return nil
 }

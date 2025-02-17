@@ -2,10 +2,13 @@ package onboardings
 
 import (
 	"context"
+	"github.com/temporalio/temporal-jumpstart-golang/onboardings/domain/workflows"
 	commandsv1 "github.com/temporalio/temporal-jumpstart-golang/onboardings/generated/onboardings/domain/commands/v1"
 	commandsv2 "github.com/temporalio/temporal-jumpstart-golang/onboardings/generated/onboardings/domain/commands/v2"
 	"time"
 )
+
+var TypeWorkflowOnboardEntity = workflows.MustGetFunctionName(OnboardEntity)
 
 const QueryEntityOnboardingState = "entityOnboardingState"
 

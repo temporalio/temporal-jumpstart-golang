@@ -230,6 +230,7 @@ func (s *OnboardEntityTestSuite) Test_GivenApprovedNoDeputy_ShouldPerformOnboard
 		Timestamp:                timestamppb.New(time.Now()),
 	}
 	approval := &commandsv1.ApproveEntityRequest{Comment: testhelper.RandomString()}
+	var approvalRejection error
 	s.env.OnActivity(TypeOnboardingsActivities.RegisterCrmEntity, mock.Anything, &commandsv1.RegisterCrmEntityRequest{
 		Id:    args.Id,
 		Value: args.Value,
@@ -239,13 +240,21 @@ func (s *OnboardEntityTestSuite) Test_GivenApprovedNoDeputy_ShouldPerformOnboard
 		DeputyOwnerEmail: args.DeputyOwnerEmail,
 	}).Never()
 	s.env.RegisterDelayedCallback(func() {
-		s.env.SignalWorkflow(workflows.SignalName(approval), approval)
+		s.env.UpdateWorkflow(workflows.UpdateName(approval), "",
+			&testsuite.TestUpdateCallback{
+				OnAccept: func() {},
+				OnReject: func(err error) {
+					approvalRejection = err
+				},
+				OnComplete: func(i interface{}, err error) {},
+			},
+			approval)
 	}, time.Second*2)
 
 	s.env.ExecuteWorkflow(s.sutWorkflowTypeName, args)
 	s.True(s.env.IsWorkflowCompleted())
 	s.NoError(s.env.GetWorkflowError())
-
+	s.Nil(approvalRejection)
 	s.env.AssertExpectations(s.T())
 }
 
@@ -323,13 +332,24 @@ func (s *OnboardEntityTestSuite) Test_GivenRejection_ShouldFailAndRevealRejectio
 		Timestamp:                timestamppb.New(time.Now()),
 	}
 	rejection := &commandsv1.RejectEntityRequest{Comment: testhelper.RandomString()}
+	var updateRejection error
 	state := &queriesv1.EntityOnboardingStateResponse{}
 	s.env.RegisterDelayedCallback(func() {
-		s.env.SignalWorkflow(workflows.SignalName(rejection), rejection)
+		s.env.UpdateWorkflow(workflows.UpdateName(rejection), "",
+			&testsuite.TestUpdateCallback{
+				OnAccept: func() {},
+				OnReject: func(err error) {
+					updateRejection = err
+				},
+				OnComplete: func(i interface{}, err error) {},
+			},
+			rejection)
 	}, time.Second*2)
 
 	s.env.ExecuteWorkflow(s.sutWorkflowTypeName, args)
 	s.True(s.env.IsWorkflowCompleted())
+
+	s.Nil(updateRejection)
 	werr := s.env.GetWorkflowError()
 	s.NotNil(werr)
 	var appErr *temporal.ApplicationError
@@ -358,7 +378,13 @@ func (s *OnboardEntityTestSuite) Test_GivenRejection_ShouldNotPerformOnboardingT
 	s.env.OnActivity(TypeOnboardingsActivities.RegisterCrmEntity, mock.Anything, mock.Anything).Never()
 	s.env.OnActivity(TypeOnboardingsActivities.SendDeputyOwnerApprovalRequest, mock.Anything, mock.Anything).Never()
 	s.env.RegisterDelayedCallback(func() {
-		s.env.SignalWorkflow(workflows.SignalName(rejection), rejection)
+		s.env.UpdateWorkflow(workflows.UpdateName(rejection), "",
+			&testsuite.TestUpdateCallback{
+				OnAccept:   func() {},
+				OnReject:   func(err error) {},
+				OnComplete: func(i interface{}, err error) {},
+			},
+			rejection)
 	}, time.Second*2)
 
 	s.env.ExecuteWorkflow(s.sutWorkflowTypeName, args)
