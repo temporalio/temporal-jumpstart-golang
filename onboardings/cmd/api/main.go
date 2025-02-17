@@ -3,7 +3,7 @@ package main
 import (
 	"context"
 	"github.com/temporalio/temporal-jumpstart-golang/onboardings/api"
-	appclients "github.com/temporalio/temporal-jumpstart-golang/onboardings/api"
+	appclients "github.com/temporalio/temporal-jumpstart-golang/onboardings/clients"
 	"github.com/temporalio/temporal-jumpstart-golang/onboardings/config"
 	"log"
 	"net/http"
