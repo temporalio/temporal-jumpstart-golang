@@ -3,12 +3,11 @@ package temporal
 import (
 	"context"
 	"github.com/temporalio/temporal-jumpstart-golang/onboardings/clients"
+	"github.com/temporalio/temporal-jumpstart-golang/onboardings/clients/snailforce"
 	"github.com/temporalio/temporal-jumpstart-golang/onboardings/config"
 	"github.com/temporalio/temporal-jumpstart-golang/onboardings/domain/workflows/onboardings"
-	"github.com/temporalio/temporal-jumpstart-golang/onboardings/generated/snailforce/v1/snailforcev1connect"
 	"go.temporal.io/sdk/contrib/resourcetuner"
 	"go.temporal.io/sdk/worker"
-	"net/http"
 )
 
 func NewAppsWorker(ctx context.Context, cfg *config.Config, clients *clients.Clients) (worker.Worker, error) {
@@ -53,7 +52,10 @@ func RegisterAppsComponents(ctx context.Context,
 	clients *clients.Clients,
 	worker worker.Worker) error {
 
-	snailforceClient := snailforcev1connect.NewSnailforceServiceClient(http.DefaultClient, cfg.Snailforce.URL.String())
+	snailforceClient, err := snailforce.NewClient(ctx, cfg, nil)
+	if err != nil {
+		return err
+	}
 	acts, err := onboardings.NewOnboardingsActivities(snailforceClient)
 	if err != nil {
 		return err
