@@ -1,6 +1,7 @@
-package onboardings
+package latest
 
 import (
+	"github.com/temporalio/temporal-jumpstart-golang/onboardings/domain/workflows/onboardings/v1"
 	commandsv2 "github.com/temporalio/temporal-jumpstart-golang/onboardings/generated/onboardings/domain/commands/v2"
 	workflowsv1 "github.com/temporalio/temporal-jumpstart-golang/onboardings/generated/onboardings/domain/workflows/v1"
 	workflowsv2 "github.com/temporalio/temporal-jumpstart-golang/onboardings/generated/onboardings/domain/workflows/v2"
@@ -16,7 +17,7 @@ import (
 func OnboardEntityNDEExtraActivity(ctx workflow.Context, args *workflowsv2.OnboardEntityRequest) error {
 
 	// first call the V1 as at first
-	if err := OnboardEntityV1(ctx, &workflowsv1.OnboardEntityRequest{
+	if err := v1.OnboardEntity(ctx, &workflowsv1.OnboardEntityRequest{
 		Timestamp:                args.Timestamp,
 		Id:                       args.Id,
 		Value:                    args.Value,

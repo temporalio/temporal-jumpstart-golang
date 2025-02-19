@@ -7,6 +7,12 @@ import "google/protobuf/timestamp.proto";
 // _add_ fields.
 package onboardings.domain.workflows.v2;
 
+enum Errors {
+  ERRORS_ONBOARD_ENTITY_TIMED_OUT = 0;
+  ERRORS_ONBOARD_ENTITY_INVALID_ARGS = 1;
+  ERRORS_ONBOARD_ENTITY_REJECTED = 2;
+}
+
 message OnboardEntityRequest {
   google.protobuf.Timestamp timestamp = 1;
   string id = 2;
