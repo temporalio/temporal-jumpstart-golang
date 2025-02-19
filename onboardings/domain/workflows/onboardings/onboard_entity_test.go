@@ -460,6 +460,15 @@ func (s *OnboardEntityTestSuite) Test_WhenApproved_ShouldPerformOnboardingTasksT
 		s.env.SignalWorkflow(workflows.SignalName(approval), approval)
 	}, time.Second*2)
 	s.env.RegisterDelayedCallback(func() {
+		s.env.UpdateWorkflow(workflows.UpdateName(approval), "",
+			&testsuite.TestUpdateCallback{
+				OnAccept:   func() {},
+				OnReject:   func(err error) {},
+				OnComplete: func(i interface{}, err error) {},
+			},
+			approval)
+	}, time.Second*2)
+	s.env.RegisterDelayedCallback(func() {
 		// this is basically ignored
 		s.env.CancelWorkflow()
 	}, time.Second*2)

@@ -40,22 +40,9 @@ func OnboardEntityV1(ctx workflow.Context, args *workflowsv1.OnboardEntityReques
 	logger.Info("Starting OnboardEntity")
 
 	// 2. configure reads
-	if err := workflow.SetQueryHandlerWithOptions(ctx, QueryEntityOnboardingState, func() (*queriesv1.EntityOnboardingStateResponse, error) {
-		now := workflow.Now(ctx)
-		logger.Debug("Onboarding State", "now", now.String())
-		threshold := calculator.calculateCompletionThreshold(workflow.Now(ctx))
-
-		timeRemaining := threshold.Sub(workflow.Now(ctx))
-		return &queriesv1.EntityOnboardingStateResponse{
-			Id:                           state.Id,
-			SentRequest:                  args,
-			Approval:                     state.Approval,
-			ApprovalTimeRemainingSeconds: uint64(timeRemaining.Seconds()),
-		}, nil
-	}, workflow.QueryHandlerOptions{
-		Description: "Get Entity Onboarding State",
-	}); err != nil {
-		return err
+	err3 := setQueryHandlers(ctx, args, state, calculator)
+	if err3 != nil {
+		return err3
 	}
 
 	// 3. validate
@@ -63,83 +50,23 @@ func OnboardEntityV1(ctx workflow.Context, args *workflowsv1.OnboardEntityReques
 		return err
 	}
 	if calculator.calculateCompletionThreshold(workflow.Now(ctx)).Sub(workflow.Now(ctx)).Seconds() <= 0 {
-		return temporal.NewApplicationError(workflowsv1.Errors_ERRORS_ONBOARD_ENTITY_TIMED_OUT.String(), workflowsv1.Errors_ERRORS_ONBOARD_ENTITY_TIMED_OUT.String())
+		return temporal.NewApplicationError(workflowsv1.Errors_ERRORS_ONBOARD_ENTITY_TIMED_OUT.String(),
+			workflowsv1.Errors_ERRORS_ONBOARD_ENTITY_TIMED_OUT.String())
 	}
 
+	// create Context the main WF can interact with
 	approvalCtx, cancelApprovalWindow := workflow.WithCancel(ctx)
-	if err := workflow.SetUpdateHandlerWithOptions(
-		approvalCtx,
-		workflows2.UpdateName(&commandsv1.ApproveEntityRequest{}),
-		func(ctx workflow.Context, cmd *commandsv1.ApproveEntityRequest) error {
-			state.Approval = &valuesv1.Approval{
-				Status:  valuesv1.ApprovalStatus_APPROVAL_STATUS_APPROVED,
-				Comment: cmd.GetComment(),
-			}
-			return nil
-		},
-		workflow.UpdateHandlerOptions{
-			Description: "Approve Entity Onboarding",
-			Validator: func(ctx workflow.Context, cmd *commandsv1.ApproveEntityRequest) error {
-				if state.Approval == nil || (state.Approval.Status == valuesv1.ApprovalStatus_APPROVAL_STATUS_PENDING ||
-					state.Approval.Status == valuesv1.ApprovalStatus_APPROVAL_STATUS_UNSPECIFIED) {
-					return nil
-				}
-				return fmt.Errorf("Onboarding Approval or Rejection has already been completed: %v", state.Approval.Status)
-			},
-		}); err != nil {
-		return err
-	}
-	if err := workflow.SetUpdateHandlerWithOptions(
-		approvalCtx,
-		workflows2.UpdateName(&commandsv1.RejectEntityRequest{}),
-		func(ctx workflow.Context, cmd *commandsv1.RejectEntityRequest) error {
-			state.Approval = &valuesv1.Approval{
-				Status:  valuesv1.ApprovalStatus_APPROVAL_STATUS_REJECTED,
-				Comment: cmd.GetComment(),
-			}
-			return nil
-		},
-		workflow.UpdateHandlerOptions{
-			Description: "Reject Entity Onboarding",
-			Validator: func(ctx workflow.Context, cmd *commandsv1.RejectEntityRequest) error {
-				if state.Approval == nil || (state.Approval.Status == valuesv1.ApprovalStatus_APPROVAL_STATUS_PENDING ||
-					state.Approval.Status == valuesv1.ApprovalStatus_APPROVAL_STATUS_UNSPECIFIED) {
-					return nil
-				}
-				return fmt.Errorf("Onboarding Approval or Rejection has already been completed: %v", state.Approval.Status)
-			},
-		}); err != nil {
-		return err
+
+	// 4 - Updates: configure write handlers
+	err2 := setUpdateHandlers(approvalCtx, state)
+	if err2 != nil {
+		return err2
 	}
 
-	// 4. configure write handlers
-	//approvalCtx, cancelApprovalWindow := workflow.WithCancel(ctx)
-	//approvalChan := workflow.GetSignalChannel(approvalCtx, workflows2.SignalName(&commandsv1.ApproveEntityRequest{}))
-	//rejectChan := workflow.GetSignalChannel(approvalCtx, workflows2.SignalName(&commandsv1.RejectEntityRequest{}))
-	//
-	//approvalsSelector := workflow.NewNamedSelector(approvalCtx, "approvals")
-	//workflow.GoNamed(ctx, "approvals", func(ctx workflow.Context) {
-	//	approvalsSelector.AddReceive(approvalChan, func(c workflow.ReceiveChannel, more bool) {
-	//		var approval *commandsv1.ApproveEntityRequest
-	//		approvalChan.Receive(ctx, &approval)
-	//		state.Approval = &valuesv1.Approval{
-	//			Status:  valuesv1.ApprovalStatus_APPROVAL_STATUS_APPROVED,
-	//			Comment: approval.GetComment(),
-	//		}
-	//	})
-	//	approvalsSelector.AddReceive(rejectChan, func(c workflow.ReceiveChannel, more bool) {
-	//		var rejection *commandsv1.RejectEntityRequest
-	//		rejectChan.Receive(ctx, &rejection)
-	//		state.Approval = &valuesv1.Approval{
-	//			Status:  valuesv1.ApprovalStatus_APPROVAL_STATUS_REJECTED,
-	//			Comment: rejection.GetComment(),
-	//		}
-	//	})
-	//	approvalsSelector.Select(ctx)
-	//})
+	// 4- Signals: configure write handlers
+	//setSignalHandlers(approvalCtx, state)
 
 	// 5. perform workflow behavior
-
 	conditionMet, err := workflow.AwaitWithTimeout(ctx, time.Duration(waitSeconds)*time.Second, func() bool {
 		return state.Approval != nil && state.Approval.Status != valuesv1.ApprovalStatus_APPROVAL_STATUS_PENDING
 	})
@@ -208,4 +135,99 @@ func OnboardEntityV1(ctx workflow.Context, args *workflowsv1.OnboardEntityReques
 		return err
 	}
 	return nil
+}
+
+func setQueryHandlers(ctx workflow.Context, args *workflowsv1.OnboardEntityRequest, state *queriesv1.EntityOnboardingStateResponse, calculator onboardEntityDurationCalculator) error {
+	if err := workflow.SetQueryHandlerWithOptions(ctx, QueryEntityOnboardingState, func() (*queriesv1.EntityOnboardingStateResponse, error) {
+		threshold := calculator.calculateCompletionThreshold(workflow.Now(ctx))
+
+		timeRemaining := threshold.Sub(workflow.Now(ctx))
+		return &queriesv1.EntityOnboardingStateResponse{
+			Id:                           state.Id,
+			SentRequest:                  args,
+			Approval:                     state.Approval,
+			ApprovalTimeRemainingSeconds: uint64(timeRemaining.Seconds()),
+		}, nil
+	}, workflow.QueryHandlerOptions{
+		Description: "Get Entity Onboarding State",
+	}); err != nil {
+		return err
+	}
+	return nil
+}
+
+func setUpdateHandlers(approvalCtx workflow.Context, state *queriesv1.EntityOnboardingStateResponse) error {
+	if err := workflow.SetUpdateHandlerWithOptions(
+		approvalCtx,
+		workflows2.UpdateName(&commandsv1.ApproveEntityRequest{}),
+		func(ctx workflow.Context, cmd *commandsv1.ApproveEntityRequest) error {
+			state.Approval = &valuesv1.Approval{
+				Status:  valuesv1.ApprovalStatus_APPROVAL_STATUS_APPROVED,
+				Comment: cmd.GetComment(),
+			}
+			return nil
+		},
+		workflow.UpdateHandlerOptions{
+			Description: "Approve Entity Onboarding",
+			Validator: func(ctx workflow.Context, cmd *commandsv1.ApproveEntityRequest) error {
+				if state.Approval == nil || (state.Approval.Status == valuesv1.ApprovalStatus_APPROVAL_STATUS_PENDING ||
+					state.Approval.Status == valuesv1.ApprovalStatus_APPROVAL_STATUS_UNSPECIFIED) {
+					return nil
+				}
+				return fmt.Errorf("Onboarding Approval or Rejection has already been completed: %v", state.Approval.Status)
+			},
+		}); err != nil {
+		return err
+	}
+	if err := workflow.SetUpdateHandlerWithOptions(
+		approvalCtx,
+		workflows2.UpdateName(&commandsv1.RejectEntityRequest{}),
+		func(ctx workflow.Context, cmd *commandsv1.RejectEntityRequest) error {
+			state.Approval = &valuesv1.Approval{
+				Status:  valuesv1.ApprovalStatus_APPROVAL_STATUS_REJECTED,
+				Comment: cmd.GetComment(),
+			}
+			return nil
+		},
+		workflow.UpdateHandlerOptions{
+			Description: "Reject Entity Onboarding",
+			Validator: func(ctx workflow.Context, cmd *commandsv1.RejectEntityRequest) error {
+				if state.Approval == nil || (state.Approval.Status == valuesv1.ApprovalStatus_APPROVAL_STATUS_PENDING ||
+					state.Approval.Status == valuesv1.ApprovalStatus_APPROVAL_STATUS_UNSPECIFIED) {
+					return nil
+				}
+				return fmt.Errorf("Onboarding Approval or Rejection has already been completed: %v", state.Approval.Status)
+			},
+		}); err != nil {
+		return err
+	}
+	return nil
+}
+
+func setSignalHandlers(ctx workflow.Context,
+	state *queriesv1.EntityOnboardingStateResponse) {
+
+	approvalChan := workflow.GetSignalChannel(ctx, workflows2.SignalName(&commandsv1.ApproveEntityRequest{}))
+	rejectChan := workflow.GetSignalChannel(ctx, workflows2.SignalName(&commandsv1.RejectEntityRequest{}))
+
+	approvalsSelector := workflow.NewNamedSelector(ctx, "approvals")
+	workflow.GoNamed(ctx, "approvals", func(ctx workflow.Context) {
+		approvalsSelector.AddReceive(approvalChan, func(c workflow.ReceiveChannel, more bool) {
+			var approval *commandsv1.ApproveEntityRequest
+			approvalChan.Receive(ctx, &approval)
+			state.Approval = &valuesv1.Approval{
+				Status:  valuesv1.ApprovalStatus_APPROVAL_STATUS_APPROVED,
+				Comment: approval.GetComment(),
+			}
+		})
+		approvalsSelector.AddReceive(rejectChan, func(c workflow.ReceiveChannel, more bool) {
+			var rejection *commandsv1.RejectEntityRequest
+			rejectChan.Receive(ctx, &rejection)
+			state.Approval = &valuesv1.Approval{
+				Status:  valuesv1.ApprovalStatus_APPROVAL_STATUS_REJECTED,
+				Comment: rejection.GetComment(),
+			}
+		})
+		approvalsSelector.Select(ctx)
+	})
 }
