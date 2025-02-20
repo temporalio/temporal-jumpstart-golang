@@ -4,9 +4,11 @@ import (
 	"context"
 	"github.com/stretchr/testify/suite"
 	"github.com/temporalio/temporal-jumpstart-golang/onboardings/domain/workflows"
-	"github.com/temporalio/temporal-jumpstart-golang/onboardings/domain/workflows/onboardings/v1"
+	"github.com/temporalio/temporal-jumpstart-golang/onboardings/domain/workflows/onboardings"
+	v1 "github.com/temporalio/temporal-jumpstart-golang/onboardings/domain/workflows/onboardings/v1"
+	commandsv1 "github.com/temporalio/temporal-jumpstart-golang/onboardings/generated/onboardings/domain/commands/v1"
 	commandsv2 "github.com/temporalio/temporal-jumpstart-golang/onboardings/generated/onboardings/domain/commands/v2"
-	workflowsv2 "github.com/temporalio/temporal-jumpstart-golang/onboardings/generated/onboardings/domain/workflows/v2"
+	workflowsv1 "github.com/temporalio/temporal-jumpstart-golang/onboardings/generated/onboardings/domain/workflows/v1"
 	"github.com/temporalio/temporal-jumpstart-golang/onboardings/testhelper"
 	"go.temporal.io/sdk/client"
 	"go.temporal.io/sdk/testsuite"
@@ -17,24 +19,6 @@ import (
 	"time"
 )
 
-type testWorker struct {
-	taskQueue string
-	worker.Worker
-}
-
-func (w *testWorker) Run(t *testing.T, runner func()) func() {
-	w.RegisterWorkflowWithOptions(v1.OnboardEntity, workflow.RegisterOptions{Name: workflows.MustGetFunctionName(OnboardEntity)})
-	if err := w.Worker.Start(); err != nil {
-		t.Fatal(err)
-	}
-	runner()
-	return func() {
-		w.Worker.Stop()
-	}
-}
-
-type testWorkerFactory func(taskQueue string) *testWorker
-
 // OnboardEntityReplayTestSuite
 // https://docs.temporal.io/docs/go/testing/
 type OnboardEntityReplayTestSuite struct {
@@ -42,7 +26,7 @@ type OnboardEntityReplayTestSuite struct {
 	server              *testsuite.DevServer
 	client              client.Client
 	sutWorkflowTypeName string
-	workerFactory       testWorkerFactory
+	workerFactory       testhelper.TestWorkerFactory
 }
 
 // SetupSuite https://pkg.go.dev/github.com/stretchr/testify/suite#SetupAllSuite
@@ -54,12 +38,14 @@ func (s *OnboardEntityReplayTestSuite) SetupSuite() {
 
 	s.server = server
 	s.client = server.Client()
-	s.sutWorkflowTypeName, _ = testhelper.GetFunctionName(OnboardEntity)
-	s.workerFactory = func(taskQueue string) *testWorker {
+	s.sutWorkflowTypeName = onboardings.TypeWorkflowOnboardEntity
+	s.workerFactory = func(taskQueue string) *testhelper.TestWorker {
 		w := worker.New(s.client, taskQueue, worker.Options{})
-		return &testWorker{
-			Worker:    w,
-			taskQueue: taskQueue,
+		return &testhelper.TestWorker{
+			Worker:           w,
+			TaskQueue:        taskQueue,
+			WorkflowType:     v1.OnboardEntity,
+			WorkflowTypeName: s.sutWorkflowTypeName,
 		}
 	}
 }
@@ -92,25 +78,24 @@ func (a *activitiesDouble) NotifyOnboardEntityCompleted(ctx context.Context, cmd
 	return nil
 }
 
-func (a *activitiesDouble) RegisterCrmEntity(ctx context.Context, q *commandsv2.RegisterCrmEntityRequest) error {
+func (a *activitiesDouble) RegisterCrmEntity(ctx context.Context, q *commandsv1.RegisterCrmEntityRequest) error {
 	if a.registerCrmEntityError != nil {
 		return a.registerCrmEntityError
 	}
 	return nil
 }
 
-func (a *activitiesDouble) SendDeputyOwnerApprovalRequest(ctx context.Context, cmd *commandsv2.RequestDeputyOwnerRequest) error {
+func (a *activitiesDouble) SendDeputyOwnerApprovalRequest(ctx context.Context, cmd *commandsv1.RequestDeputyOwnerRequest) error {
 	//TODO implement me
 	panic("implement me")
 }
 
 func (s *OnboardEntityReplayTestSuite) Test_OnboardEntityV1_ToV2_ReplayWithApproval_NoPatch_ExposesNDE() {
-	var historyTarget = OnboardEntityNDEExtraActivity
 
 	var taskQueue = testhelper.RandomString()
 	w := s.workerFactory(taskQueue)
 
-	args := &workflowsv2.OnboardEntityRequest{
+	args := &workflowsv1.OnboardEntityRequest{
 		Id:                       testhelper.RandomString(),
 		Value:                    testhelper.RandomString(),
 		CompletionTimeoutSeconds: 5,
@@ -133,7 +118,7 @@ func (s *OnboardEntityReplayTestSuite) Test_OnboardEntityV1_ToV2_ReplayWithAppro
 			s.sutWorkflowTypeName, args)
 		s.NoError(err)
 		time.Sleep(time.Second * 2)
-		var approval = &commandsv2.ApproveEntityRequest{Comment: testhelper.RandomString()}
+		var approval = &commandsv1.ApproveEntityRequest{Comment: testhelper.RandomString()}
 		_, err = s.client.UpdateWorkflow(ctx, client.UpdateWorkflowOptions{
 			WorkflowID:   args.Id,
 			Args:         []interface{}{approval},
@@ -141,14 +126,9 @@ func (s *OnboardEntityReplayTestSuite) Test_OnboardEntityV1_ToV2_ReplayWithAppro
 			WaitForStage: client.WorkflowUpdateStageAccepted,
 		})
 		s.NoError(err)
-		_, err = s.client.UpdateWorkflow(ctx, client.UpdateWorkflowOptions{
-			WorkflowID:   run.GetID(),
-			Args:         []interface{}{approval},
-			UpdateName:   workflows.UpdateName(approval),
-			WaitForStage: client.WorkflowUpdateStageAccepted,
-		})
+
 		// either wait for the WF to complete or give some time for the Task to reply back with events
-		s.NoError(run.Get(ctx, nil))
+		s.Require().NoError(run.Get(ctx, nil))
 
 		s.T().Log("Workflow completed successfully")
 
@@ -159,8 +139,7 @@ func (s *OnboardEntityReplayTestSuite) Test_OnboardEntityV1_ToV2_ReplayWithAppro
 		replayer := worker.NewWorkflowReplayer()
 
 		// here we use the RegisterOptions to slip in our new implementation registered by the old name
-		replayer.RegisterWorkflowWithOptions(historyTarget,
-			workflow.RegisterOptions{Name: s.sutWorkflowTypeName})
+		replayer.RegisterWorkflowWithOptions(OnboardEntityNDEExtraActivity, workflow.RegisterOptions{Name: s.sutWorkflowTypeName})
 
 		s.ErrorContains(replayer.ReplayWorkflowHistoryWithOptions(
 			nil,
@@ -171,9 +150,9 @@ func (s *OnboardEntityReplayTestSuite) Test_OnboardEntityV1_ToV2_ReplayWithAppro
 }
 
 func (s *OnboardEntityReplayTestSuite) Test_OnboardEntityV1_ToV2_GivenPatched_DoesNotNDE() {
-	var historyTarget = OnboardEntity
+	//var historyTarget = OnboardEntity
 
-	args := &workflowsv2.OnboardEntityRequest{
+	args := &workflowsv1.OnboardEntityRequest{
 		Id:                       testhelper.RandomString(),
 		Value:                    testhelper.RandomString(),
 		CompletionTimeoutSeconds: 5,
@@ -198,7 +177,7 @@ func (s *OnboardEntityReplayTestSuite) Test_OnboardEntityV1_ToV2_GivenPatched_Do
 			s.sutWorkflowTypeName, args)
 		s.NoError(err)
 		time.Sleep(time.Second * 2)
-		var approval = &commandsv2.ApproveEntityRequest{Comment: testhelper.RandomString()}
+		var approval = &commandsv1.ApproveEntityRequest{Comment: testhelper.RandomString()}
 		_, err = s.client.UpdateWorkflow(ctx, client.UpdateWorkflowOptions{
 			WorkflowID:   run.GetID(),
 			Args:         []interface{}{approval},
@@ -206,19 +185,19 @@ func (s *OnboardEntityReplayTestSuite) Test_OnboardEntityV1_ToV2_GivenPatched_Do
 			WaitForStage: client.WorkflowUpdateStageAccepted,
 		})
 		// either wait for the WF to complete or give some time for the Task to reply back with events
-		s.NoError(run.Get(ctx, nil))
+		s.Require().NoError(run.Get(ctx, nil))
 
 		s.T().Log("Workflow completed successfully")
 
 		// grab the WF history
 		history, err := testhelper.GetWorkflowHistory(ctx, s.client, args.Id)
+		s.NoError(err)
 
 		// attempt replay
 		replayer := worker.NewWorkflowReplayer()
 
 		// here we use the RegisterOptions to slip in our new implementation registered by the old name
-		replayer.RegisterWorkflowWithOptions(historyTarget,
-			workflow.RegisterOptions{Name: s.sutWorkflowTypeName})
+		replayer.RegisterWorkflow(OnboardEntity)
 
 		s.NoError(replayer.ReplayWorkflowHistoryWithOptions(
 			nil,

@@ -4,6 +4,7 @@ import (
 	"fmt"
 	workflows2 "github.com/temporalio/temporal-jumpstart-golang/onboardings/domain/workflows"
 	"github.com/temporalio/temporal-jumpstart-golang/onboardings/domain/workflows/onboardings"
+	commandsv1 "github.com/temporalio/temporal-jumpstart-golang/onboardings/generated/onboardings/domain/commands/v1"
 	commandsv2 "github.com/temporalio/temporal-jumpstart-golang/onboardings/generated/onboardings/domain/commands/v2"
 	queriesv2 "github.com/temporalio/temporal-jumpstart-golang/onboardings/generated/onboardings/domain/queries/v2"
 	valuesv1 "github.com/temporalio/temporal-jumpstart-golang/onboardings/generated/onboardings/domain/values/v1"
@@ -24,7 +25,8 @@ func assertValidArgsv2(args *workflowsv2.OnboardEntityRequest) error {
 		!args.Timestamp.AsTime().IsZero() {
 		return nil
 	}
-	return temporal.NewApplicationError(workflowsv2.Errors_ERRORS_ONBOARD_ENTITY_INVALID_ARGS.String(), workflowsv2.Errors_ERRORS_ONBOARD_ENTITY_INVALID_ARGS.String())
+	return temporal.NewApplicationError(workflowsv1.Errors_ERRORS_ONBOARD_ENTITY_INVALID_ARGS.String(),
+		workflowsv1.Errors_ERRORS_ONBOARD_ENTITY_INVALID_ARGS.String())
 }
 
 // OnboardEntity is always the `latest` of this Application.
@@ -66,8 +68,8 @@ func OnboardEntity(ctx workflow.Context, args *workflowsv2.OnboardEntityRequest)
 		return err
 	}
 	if calculator.CalculateCompletionThreshold(workflow.Now(ctx)).Sub(workflow.Now(ctx)).Seconds() <= 0 {
-		return temporal.NewApplicationError(workflowsv2.Errors_ERRORS_ONBOARD_ENTITY_TIMED_OUT.String(),
-			workflowsv2.Errors_ERRORS_ONBOARD_ENTITY_TIMED_OUT.String())
+		return temporal.NewApplicationError(workflowsv1.Errors_ERRORS_ONBOARD_ENTITY_TIMED_OUT.String(),
+			workflowsv1.Errors_ERRORS_ONBOARD_ENTITY_TIMED_OUT.String())
 	}
 
 	// create Context the main WF can interact with
@@ -102,7 +104,7 @@ func OnboardEntity(ctx workflow.Context, args *workflowsv2.OnboardEntityRequest)
 			},
 		})
 
-		if err := workflow.ExecuteActivity(notificationCtx, onboardings.TypeOnboardingsActivities.SendDeputyOwnerApprovalRequest, &commandsv2.RequestDeputyOwnerRequest{
+		if err := workflow.ExecuteActivity(notificationCtx, onboardings.TypeOnboardingsActivities.SendDeputyOwnerApprovalRequest, &commandsv1.RequestDeputyOwnerRequest{
 			Id:               args.Id,
 			DeputyOwnerEmail: args.DeputyOwnerEmail,
 		}).Get(notificationCtx, nil); err != nil {
@@ -141,7 +143,7 @@ func OnboardEntity(ctx workflow.Context, args *workflowsv2.OnboardEntityRequest)
 	// the rest of this is for approved onboardings
 	actCtx, _ := workflow.NewDisconnectedContext(ctx)
 	ao := workflow.WithActivityOptions(actCtx, workflow.ActivityOptions{StartToCloseTimeout: time.Second * 30})
-	if err = workflow.ExecuteActivity(ao, onboardings.OnboardEntityActivities.RegisterCrmEntity, &commandsv2.RegisterCrmEntityRequest{
+	if err = workflow.ExecuteActivity(ao, onboardings.OnboardEntityActivities.RegisterCrmEntity, &commandsv1.RegisterCrmEntityRequest{
 		Id:    args.Id,
 		Value: args.Value,
 	}).Get(actCtx, nil); err != nil {
@@ -191,8 +193,8 @@ func setQueryHandlers(ctx workflow.Context, args *workflowsv2.OnboardEntityReque
 func setUpdateHandlers(approvalCtx workflow.Context, state *queriesv2.EntityOnboardingStateResponse) error {
 	if err := workflow.SetUpdateHandlerWithOptions(
 		approvalCtx,
-		workflows2.UpdateName(&commandsv2.ApproveEntityRequest{}),
-		func(ctx workflow.Context, cmd *commandsv2.ApproveEntityRequest) error {
+		workflows2.UpdateName(&commandsv1.ApproveEntityRequest{}),
+		func(ctx workflow.Context, cmd *commandsv1.ApproveEntityRequest) error {
 			state.Approval = &valuesv1.Approval{
 				Status:  valuesv1.ApprovalStatus_APPROVAL_STATUS_APPROVED,
 				Comment: cmd.GetComment(),
@@ -201,7 +203,7 @@ func setUpdateHandlers(approvalCtx workflow.Context, state *queriesv2.EntityOnbo
 		},
 		workflow.UpdateHandlerOptions{
 			Description: "Approve Entity Onboarding",
-			Validator: func(ctx workflow.Context, cmd *commandsv2.ApproveEntityRequest) error {
+			Validator: func(ctx workflow.Context, cmd *commandsv1.ApproveEntityRequest) error {
 				if state.Approval == nil || (state.Approval.Status == valuesv1.ApprovalStatus_APPROVAL_STATUS_PENDING ||
 					state.Approval.Status == valuesv1.ApprovalStatus_APPROVAL_STATUS_UNSPECIFIED) {
 					return nil
@@ -213,8 +215,8 @@ func setUpdateHandlers(approvalCtx workflow.Context, state *queriesv2.EntityOnbo
 	}
 	if err := workflow.SetUpdateHandlerWithOptions(
 		approvalCtx,
-		workflows2.UpdateName(&commandsv2.RejectEntityRequest{}),
-		func(ctx workflow.Context, cmd *commandsv2.RejectEntityRequest) error {
+		workflows2.UpdateName(&commandsv1.RejectEntityRequest{}),
+		func(ctx workflow.Context, cmd *commandsv1.RejectEntityRequest) error {
 			state.Approval = &valuesv1.Approval{
 				Status:  valuesv1.ApprovalStatus_APPROVAL_STATUS_REJECTED,
 				Comment: cmd.GetComment(),
@@ -223,7 +225,7 @@ func setUpdateHandlers(approvalCtx workflow.Context, state *queriesv2.EntityOnbo
 		},
 		workflow.UpdateHandlerOptions{
 			Description: "Reject Entity Onboarding",
-			Validator: func(ctx workflow.Context, cmd *commandsv2.RejectEntityRequest) error {
+			Validator: func(ctx workflow.Context, cmd *commandsv1.RejectEntityRequest) error {
 				if state.Approval == nil || (state.Approval.Status == valuesv1.ApprovalStatus_APPROVAL_STATUS_PENDING ||
 					state.Approval.Status == valuesv1.ApprovalStatus_APPROVAL_STATUS_UNSPECIFIED) {
 					return nil

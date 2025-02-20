@@ -32,7 +32,7 @@ func OnboardEntityNDEExtraActivity(ctx workflow.Context, args *workflowsv2.Onboa
 		RetryPolicy:         &temporal.RetryPolicy{MaximumAttempts: 2}})
 
 	// this should raise an NDE since we introduce this without a GetVersion call (patch)
-	if err := workflow.ExecuteActivity(notificationCtx, "NotifyOnboardEntityCompleted", &commandsv2.NotifyOnboardEntityCompletedRequest{
+	if err := workflow.ExecuteActivity(notificationCtx, "AnythingWillCauseNDEError", &commandsv2.NotifyOnboardEntityCompletedRequest{
 		Id:       args.Id,
 		Email:    args.Email,
 		Value:    args.Value,
