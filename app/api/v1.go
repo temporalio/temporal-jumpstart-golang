@@ -69,10 +69,11 @@ func createV1Router(ctx context.Context, deps *V1Dependencies, router *mux.Route
 		workflowId := vars["id"]
 
 		options := client.StartWorkflowOptions{
-			ID:                       workflowId,
-			TaskQueue:                deps.Config.Temporal.Worker.TaskQueue,
-			WorkflowIDReusePolicy:    enums.WORKFLOW_ID_REUSE_POLICY_ALLOW_DUPLICATE_FAILED_ONLY,
-			WorkflowIDConflictPolicy: enums.WORKFLOW_ID_CONFLICT_POLICY_FAIL,
+			ID:                                       workflowId,
+			TaskQueue:                                deps.Config.Temporal.Worker.TaskQueue,
+			WorkflowIDReusePolicy:                    enums.WORKFLOW_ID_REUSE_POLICY_ALLOW_DUPLICATE_FAILED_ONLY,
+			WorkflowIDConflictPolicy:                 enums.WORKFLOW_ID_CONFLICT_POLICY_FAIL,
+			WorkflowExecutionErrorWhenAlreadyStarted: true,
 		}
 
 		wfRun, err := deps.Clients.Temporal.ExecuteWorkflow(r.Context(), options, workflows.Ping, body.Ping)

@@ -3,6 +3,7 @@ module github.com/temporalio/temporal-jumpstart-golang
 go 1.21.6
 
 require (
+	connectrpc.com/connect v1.18.1
 	github.com/google/uuid v1.6.0
 	github.com/gorilla/handlers v1.5.2
 	github.com/gorilla/mux v1.8.1
@@ -13,6 +14,8 @@ require (
 	go.temporal.io/sdk v1.32.1
 	go.temporal.io/sdk/contrib/resourcetuner v0.0.0-20250128201316-7728bd7b72d2
 	go.temporal.io/sdk/contrib/tally v0.2.0
+	golang.org/x/net v0.33.0
+	google.golang.org/protobuf v1.36.5
 )
 
 require (
@@ -46,14 +49,12 @@ require (
 	go.einride.tech/pid v0.1.3 // indirect
 	go.uber.org/atomic v1.9.0 // indirect
 	golang.org/x/exp v0.0.0-20231127185646-65229373498e // indirect
-	golang.org/x/net v0.28.0 // indirect
-	golang.org/x/sync v0.8.0 // indirect
-	golang.org/x/sys v0.24.0 // indirect
-	golang.org/x/text v0.17.0 // indirect
+	golang.org/x/sync v0.10.0 // indirect
+	golang.org/x/sys v0.28.0 // indirect
+	golang.org/x/text v0.21.0 // indirect
 	golang.org/x/time v0.3.0 // indirect
 	google.golang.org/genproto/googleapis/api v0.0.0-20240827150818-7e3bb234dfed // indirect
 	google.golang.org/genproto/googleapis/rpc v0.0.0-20240827150818-7e3bb234dfed // indirect
 	google.golang.org/grpc v1.66.0 // indirect
-	google.golang.org/protobuf v1.34.2 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 )

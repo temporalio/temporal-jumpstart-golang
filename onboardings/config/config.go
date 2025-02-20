@@ -15,6 +15,7 @@ type Config struct {
 	Temporal     *TemporalConfig
 	IsProduction bool
 	API          *APIConfig
+	Snailforce   *SnailforceConfig
 }
 
 type MTLSConfig struct {
@@ -74,6 +75,11 @@ type APIConfig struct {
 	URL  *url.URL
 }
 
+type SnailforceConfig struct {
+	URL  *url.URL
+	Port string
+}
+
 func MustNewConfig() *Config {
 	cfg, err := NewConfig()
 	if err != nil {
@@ -96,11 +102,16 @@ func NewConfig() (*Config, error) {
 	if err != nil {
 		return nil, err
 	}
+	snailforceCfg, err := createSnailforceConfig()
+	if err != nil {
+		return nil, err
+	}
 
 	return &Config{
 		Temporal:     temporalCfg,
 		IsProduction: strings.ToLower(os.Getenv("ENV")) == "production",
 		API:          apiCfg,
+		Snailforce:   snailforceCfg,
 	}, nil
 }
 
@@ -193,6 +204,17 @@ func createTemporalCfg() (*TemporalConfig, error) {
 	return &TemporalConfig{
 		Connection: connection,
 		Worker:     worker,
+	}, nil
+}
+
+func createSnailforceConfig() (*SnailforceConfig, error) {
+	surl, err := url.Parse(os.Getenv("SNAILFORCE_API_URL"))
+	if err != nil {
+		return nil, err
+	}
+	return &SnailforceConfig{
+		URL:  surl,
+		Port: surl.Port(),
 	}, nil
 }
 func floatOrNot(key string) float64 {

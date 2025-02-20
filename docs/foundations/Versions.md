@@ -266,15 +266,15 @@ Alternately, you can run these tests as a *verification* step and might put thes
 
 Regardless of your environment or where in the delivery process these appear, they are an important investment to your production quality.
 
-#### Recommendations
+#### Replay Test Recommendations
 
-Replay tests should exercise history that was produced by various code paths through your Executions.
-If your Workflow Definition has conditional branches, loops, or timers, it makes sense to store histories created by the unit test cases that verify these scenarios with the
-execution histories _caused_ by the scenarios in the `latest` build so that they might be validated in `vNext` implementations.
-
-Factors which determine how these tests are executed are based on your Workflow Version strategy and isolation boundaries present in your
-Continuous Integration / Continuous Deployment (CICD) pipeline.
-
+* Scope: Try to make each `Workflow` the boundary for a Replay test. 
+* Dependencies: Provide Activity or ChildWorkflow doubles to test various conditional paths more easily. 
+  * This includes when you plan on simultaneously shipping Activity AND Workflow Code together. Check the inputs and outputs work together.
+* Scenarios: Try to reproduce (or reuse) the scenarios you exercise in your other functional or unit tests to produce various histories that can be validated in the proposed version.
+  * The ease of this can be affected by the SDK test environment you are using though so look in the [sdk](../sdk/Tests.md) for a deeper dive on this topic.
+* Deployments: Temporal Task scheduling during Rolling deployments create a race across replicas as they are made available. 
+  * Be sure to code defensively against rolling deployment races that service message contracts over time.
 
 #### Implementing Replay Tests : Patched Version Strategy
 
