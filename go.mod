@@ -10,7 +10,7 @@ require (
 	github.com/joho/godotenv v1.5.1
 	github.com/stretchr/testify v1.10.0
 	github.com/uber-go/tally/v4 v4.1.16
-	go.temporal.io/api v1.43.2
+	go.temporal.io/api v1.44.1
 	go.temporal.io/sdk v1.32.1
 	go.temporal.io/sdk/contrib/resourcetuner v0.0.0-20250128201316-7728bd7b72d2
 	go.temporal.io/sdk/contrib/tally v0.2.0
