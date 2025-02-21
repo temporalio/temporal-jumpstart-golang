@@ -1,6 +1,5 @@
 syntax = "proto3";
 import "onboardings/domain/values/v1/message.proto";
-
 package onboardings.api.v1;
 
 message ApprovalsPut {

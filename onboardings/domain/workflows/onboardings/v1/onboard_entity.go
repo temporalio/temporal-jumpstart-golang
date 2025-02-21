@@ -80,7 +80,8 @@ func OnboardEntity(ctx workflow.Context, args *workflowsv1.OnboardEntityRequest)
 
 	// 5. perform workflow behavior
 	conditionMet, err := workflow.AwaitWithTimeout(ctx, time.Duration(waitSeconds)*time.Second, func() bool {
-		return state.Approval != nil && state.Approval.Status != valuesv1.ApprovalStatus_APPROVAL_STATUS_PENDING
+		return state.Approval != nil && (state.Approval.Status != valuesv1.ApprovalStatus_APPROVAL_STATUS_PENDING &&
+			state.Approval.Status != valuesv1.ApprovalStatus_APPROVAL_STATUS_UNSPECIFIED)
 	})
 	// no longer eligible for approval while we figure out what to do next
 	cancelApprovalWindow()

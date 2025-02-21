@@ -16,6 +16,7 @@ type Config struct {
 	IsProduction bool
 	API          *APIConfig
 	Snailforce   *SnailforceConfig
+	Onboardings  *OnboardingsConfig
 }
 
 type MTLSConfig struct {
@@ -80,6 +81,10 @@ type SnailforceConfig struct {
 	Port string
 }
 
+type OnboardingsConfig struct {
+	CompletionTimeoutSeconds uint64
+}
+
 func MustNewConfig() *Config {
 	cfg, err := NewConfig()
 	if err != nil {
@@ -106,12 +111,17 @@ func NewConfig() (*Config, error) {
 	if err != nil {
 		return nil, err
 	}
+	onboardingsCfg, err := createOnboardingsConfig()
+	if err != nil {
+		return nil, err
+	}
 
 	return &Config{
 		Temporal:     temporalCfg,
 		IsProduction: strings.ToLower(os.Getenv("ENV")) == "production",
 		API:          apiCfg,
 		Snailforce:   snailforceCfg,
+		Onboardings:  onboardingsCfg,
 	}, nil
 }
 
@@ -215,6 +225,16 @@ func createSnailforceConfig() (*SnailforceConfig, error) {
 	return &SnailforceConfig{
 		URL:  surl,
 		Port: surl.Port(),
+	}, nil
+}
+
+func createOnboardingsConfig() (*OnboardingsConfig, error) {
+	completionTimeoutSeconds, err := strconv.ParseUint(os.Getenv("ONBOARDINGS_COMPLETION_TIMEOUT_SECONDS"), 10, 64)
+	if err != nil {
+		return nil, err
+	}
+	return &OnboardingsConfig{
+		CompletionTimeoutSeconds: completionTimeoutSeconds,
 	}, nil
 }
 func floatOrNot(key string) float64 {

@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"github.com/gorilla/mux"
 	"github.com/temporalio/temporal-jumpstart-golang/onboardings/api/encoding"
 	"github.com/temporalio/temporal-jumpstart-golang/onboardings/api/messages"
 	"github.com/temporalio/temporal-jumpstart-golang/onboardings/clients"
@@ -15,12 +16,12 @@ import (
 	workflowsv1 "github.com/temporalio/temporal-jumpstart-golang/onboardings/generated/onboardings/domain/workflows/v1"
 	"go.temporal.io/api/enums/v1"
 	"go.temporal.io/api/serviceerror"
+	"go.temporal.io/sdk/client"
+	"google.golang.org/protobuf/types/known/timestamppb"
 	"log"
 	"net/http"
 	"net/url"
-
-	"github.com/gorilla/mux"
-	"go.temporal.io/sdk/client"
+	"time"
 )
 
 type V1Dependencies struct {
@@ -173,9 +174,10 @@ func createV1Router(ctx context.Context, deps *V1Dependencies, router *mux.Route
 		params := &workflowsv1.OnboardEntityRequest{
 			Id:                       workflowId,
 			Value:                    body.Value,
-			CompletionTimeoutSeconds: 0,
+			CompletionTimeoutSeconds: deps.Config.Onboardings.CompletionTimeoutSeconds,
 			DeputyOwnerEmail:         "",
 			SkipApproval:             false,
+			Timestamp:                timestamppb.New(time.Now().UTC()),
 		}
 
 		_, err := deps.Clients.Temporal.ExecuteWorkflow(r.Context(), options, onboardings.TypeWorkflowOnboardEntity, params)

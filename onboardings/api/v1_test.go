@@ -117,7 +117,7 @@ func testV1PutApprovalParamsSignalsRelatedOnboarding(t *testing.T) {
 				opts.WorkflowExecutionErrorWhenAlreadyStarted == true
 		}), mock.MatchedBy(func(fn interface{}) bool {
 			funcName, _ := testhelper.GetFunctionName(fn)
-			return funcName == "OnboardEntityV1"
+			return funcName == "OnboardEntity"
 		}), mock.MatchedBy(func(params []interface{}) bool {
 			panic("not implemented")
 
@@ -185,7 +185,7 @@ func TestV1PutOnboardingStartsOnboardEntityWithCorrectParams(t *testing.T) {
 			if !ok {
 				return false
 			}
-			return arg.Value == body.GetValue() && arg.Id == workflowId
+			return arg.Value == body.GetValue() && arg.Id == workflowId && !arg.Timestamp.AsTime().IsZero()
 		})).Once().Return(&TestWorkflowRun{id: workflowId}, nil)
 	c := &clients.Clients{Temporal: temporalClient}
 	sut := createV1Router(ctx, &V1Dependencies{
