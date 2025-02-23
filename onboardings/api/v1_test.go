@@ -179,6 +179,45 @@ func TestV1RejectionUpdatesRelatedOnboarding(t *testing.T) {
 	temporalClient.AssertExpectations(t)
 }
 
+// state test
+func TestV1InvalidApprovalReturns400(t *testing.T) {
+	A := assert.New(t)
+	ctx := context.Background()
+	workflowId := testhelper.RandomString()
+	body := &apiv1.ApprovalsPut{
+		Id: workflowId,
+		Approval: &valuesv1.Approval{
+			Status:  valuesv1.ApprovalStatus_APPROVAL_STATUS_UNSPECIFIED,
+			Comment: testhelper.RandomString(),
+		},
+	}
+	cfg := &config.Config{
+		Temporal: &config.TemporalConfig{
+			Worker: &config.TemporalWorker{TaskQueue: testhelper.RandomString()},
+		},
+	}
+	temporalClient := &testhelper.MockTemporalClient{}
+	temporalClient.On("UpdateWorkflow", mock.Anything, mock.Anything).Times(0)
+	c := &clients.Clients{Temporal: temporalClient}
+	sut := createV1Router(ctx, &V1Dependencies{
+		Clients: c,
+		Config:  cfg,
+	}, mux.NewRouter())
+	testserver := httptest.NewServer(sut)
+	defer testserver.Close()
+	jsonBody, err := json.Marshal(&body)
+	A.NoError(err)
+	parsedUrl, err := url.Parse(testserver.URL + "/approvals/" + workflowId)
+	A.NoError(err)
+	req, err := http.NewRequest("PUT", parsedUrl.String(), bytes.NewReader(jsonBody))
+	A.NoError(err)
+	req.Header.Add("Content-Type", "application/json")
+	req.Header.Add("Host", testserver.URL)
+	res, err := testserver.Client().Do(req)
+	A.NoError(err)
+	A.Equal(http.StatusBadRequest, res.StatusCode)
+}
+
 // resource behavior test
 func TestV1PutOnboardingStartsOnboardEntityWithCorrectParams(t *testing.T) {
 	A := assert.New(t)
