@@ -82,3 +82,51 @@ func (val *TestEncodedValue) Get(valuePtr interface{}) error {
 	reflect.ValueOf(valuePtr).Elem().Set(result)
 	return nil
 }
+
+type TestWorkflowRun struct {
+	WorkflowID string
+	RunID      string
+}
+
+func (t *TestWorkflowRun) GetID() string {
+	//TODO implement me
+	return t.WorkflowID
+}
+
+func (t *TestWorkflowRun) GetRunID() string {
+	//TODO implement me
+	return t.RunID
+}
+
+func (t *TestWorkflowRun) Get(ctx context.Context, valuePtr interface{}) error {
+	//TODO implement me
+	panic("implement me")
+}
+
+func (t *TestWorkflowRun) GetWithOptions(ctx context.Context, valuePtr interface{}, options client.WorkflowRunGetOptions) error {
+	//TODO implement me
+	panic("implement me")
+}
+
+type TestWorkflowUpdateHandle struct {
+	WorkflowIDToUse string
+}
+
+func (t *TestWorkflowUpdateHandle) WorkflowID() string {
+	return t.WorkflowIDToUse
+}
+
+func (t *TestWorkflowUpdateHandle) RunID() string {
+	//TODO implement me
+	panic("implement me")
+}
+
+func (t *TestWorkflowUpdateHandle) UpdateID() string {
+	//TODO implement me
+	panic("implement me")
+}
+
+func (t *TestWorkflowUpdateHandle) Get(ctx context.Context, valuePtr interface{}) error {
+	//TODO implement me
+	panic("implement me")
+}

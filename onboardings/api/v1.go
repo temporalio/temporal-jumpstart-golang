@@ -12,11 +12,14 @@ import (
 	"github.com/temporalio/temporal-jumpstart-golang/onboardings/domain/workflows"
 	"github.com/temporalio/temporal-jumpstart-golang/onboardings/domain/workflows/onboardings"
 	apiv1 "github.com/temporalio/temporal-jumpstart-golang/onboardings/generated/onboardings/api/v1"
+	commandsv1 "github.com/temporalio/temporal-jumpstart-golang/onboardings/generated/onboardings/domain/commands/v1"
 	queriesv1 "github.com/temporalio/temporal-jumpstart-golang/onboardings/generated/onboardings/domain/queries/v1"
+	valuesv1 "github.com/temporalio/temporal-jumpstart-golang/onboardings/generated/onboardings/domain/values/v1"
 	workflowsv1 "github.com/temporalio/temporal-jumpstart-golang/onboardings/generated/onboardings/domain/workflows/v1"
 	"go.temporal.io/api/enums/v1"
 	"go.temporal.io/api/serviceerror"
 	"go.temporal.io/sdk/client"
+	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/known/timestamppb"
 	"log"
 	"net/http"
@@ -206,6 +209,41 @@ func createV1Router(ctx context.Context, deps *V1Dependencies, router *mux.Route
 		location := link.ResolveReference(r.URL)
 
 		w.Header().Set("Location", location.String())
+		w.WriteHeader(http.StatusAccepted)
+	}).Methods(http.MethodPut)
+
+	router.HandleFunc("/approvals/{id}", func(w http.ResponseWriter, r *http.Request) {
+		c := deps.Clients.Temporal
+		var body *apiv1.ApprovalsPut
+		if err := encoding.DecodeJSONBody(w, r, &body); err != nil {
+			http.Error(w, err.Error(), http.StatusBadRequest)
+			return
+		}
+
+		vars := mux.Vars(r)
+		workflowId := vars["id"]
+		var params proto.Message
+		status := body.GetApproval().Status
+		if status == valuesv1.ApprovalStatus_APPROVAL_STATUS_APPROVED {
+			params = &commandsv1.ApproveEntityRequest{Comment: body.GetApproval().Comment}
+			// do update
+		} else if status == valuesv1.ApprovalStatus_APPROVAL_STATUS_REJECTED {
+			params = &commandsv1.RejectEntityRequest{Comment: body.GetApproval().Comment}
+		} else {
+			http.Error(w, "Invalid Approval/Rejection", http.StatusBadRequest)
+			return
+		}
+		if _, err := c.UpdateWorkflow(ctx, client.UpdateWorkflowOptions{
+			UpdateName:   workflows.UpdateName(params),
+			Args:         []interface{}{params},
+			WorkflowID:   workflowId,
+			WaitForStage: client.WorkflowUpdateStageAccepted,
+		}); err != nil {
+			log.Printf("Failed to update workflow '%s': %v", workflowId, err)
+			http.Error(w, "Internal Server Error", http.StatusInternalServerError)
+			return
+		}
+
 		w.WriteHeader(http.StatusAccepted)
 	}).Methods(http.MethodPut)
 
