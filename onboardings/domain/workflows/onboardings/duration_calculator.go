@@ -30,6 +30,7 @@ func (c *OnboardEntityDurationCalculator) ResolveCompletionTimeoutSeconds(now ti
 // taking into consideration the DeputyOwner argument and the Product requirement that we shall
 // give 40% of the time before reaching out to the deputy to ask for approval.
 func (c *OnboardEntityDurationCalculator) CalculateWaitSeconds(now time.Time) uint64 {
+	now = now.UTC()
 	completionTimeoutSeconds := c.ResolveCompletionTimeoutSeconds(now)
 	if completionTimeoutSeconds == 0 {
 		return completionTimeoutSeconds
@@ -45,5 +46,6 @@ func (c *OnboardEntityDurationCalculator) CalculateWaitSeconds(now time.Time) ui
 }
 
 func (c *OnboardEntityDurationCalculator) CalculateCompletionThreshold(now time.Time) time.Time {
+	now = now.UTC()
 	return c.Timestamp.Add(time.Second * time.Duration(c.ResolveCompletionTimeoutSeconds(now)))
 }

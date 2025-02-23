@@ -177,8 +177,11 @@ func (m *MockTemporalClient) CheckHealth(ctx context.Context, request *client.Ch
 }
 
 func (m *MockTemporalClient) UpdateWorkflow(ctx context.Context, options client.UpdateWorkflowOptions) (client.WorkflowUpdateHandle, error) {
-	//TODO implement me
-	panic("implement me")
+	a := m.Called(ctx, options)
+	if a.Get(0) == nil {
+		return nil, a.Error(1)
+	}
+	return a.Get(0).(client.WorkflowUpdateHandle), a.Error(1)
 }
 
 func (m *MockTemporalClient) UpdateWorkflowExecutionOptions(ctx context.Context, options client.UpdateWorkflowExecutionOptionsRequest) (client.WorkflowExecutionOptions, error) {
