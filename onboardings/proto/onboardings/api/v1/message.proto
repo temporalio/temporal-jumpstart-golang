@@ -8,6 +8,7 @@ message ApprovalsPut {
 }
 message OnboardingsPut {
   string value = 1;
+  string deputyOwnerEmail = 2;
 }
 message OnboardingsGet {
   string id = 1;

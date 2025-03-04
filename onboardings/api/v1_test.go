@@ -253,7 +253,8 @@ func TestV1PutOnboardingStartsOnboardEntityWithCorrectParams(t *testing.T) {
 			}
 			return arg.Value == body.GetValue() &&
 				arg.Id == workflowId &&
-				!arg.Timestamp.AsTime().IsZero()
+				!arg.Timestamp.AsTime().IsZero() &&
+				arg.DeputyOwnerEmail == body.DeputyOwnerEmail
 		})).Once().Return(&testhelper.TestWorkflowRun{WorkflowID: workflowId}, nil)
 	c := &clients.Clients{Temporal: temporalClient}
 	sut := createV1Router(ctx, &V1Dependencies{

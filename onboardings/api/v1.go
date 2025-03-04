@@ -77,16 +77,10 @@ func createV1Router(ctx context.Context, deps *V1Dependencies, router *mux.Route
 		workflowId := vars["id"]
 
 		options := client.StartWorkflowOptions{
-			ID:        workflowId,
-			TaskQueue: deps.Config.Temporal.Worker.TaskQueue,
-			// This configures how to deal with prior attempts of an Onboarding.
-			// We want to allow a "do over" of the Onboarding only if the prior attempts failed.
-			WorkflowIDReusePolicy: enums.WORKFLOW_ID_REUSE_POLICY_ALLOW_DUPLICATE_FAILED_ONLY,
-			// This configures how to deal with any Running Onboarding currently in progress.
-			// We want to fail if already in flight.
-			WorkflowIDConflictPolicy: enums.WORKFLOW_ID_CONFLICT_POLICY_FAIL,
-			// This makes explicit when our Onboarding could not be started due to the configuration above.
-			// Otherwise, this could silently fail and it becomes harder to track down.
+			ID:                                       workflowId,
+			TaskQueue:                                deps.Config.Temporal.Worker.TaskQueue,
+			WorkflowIDReusePolicy:                    enums.WORKFLOW_ID_REUSE_POLICY_ALLOW_DUPLICATE_FAILED_ONLY,
+			WorkflowIDConflictPolicy:                 enums.WORKFLOW_ID_CONFLICT_POLICY_FAIL,
 			WorkflowExecutionErrorWhenAlreadyStarted: true,
 		}
 
@@ -167,10 +161,16 @@ func createV1Router(ctx context.Context, deps *V1Dependencies, router *mux.Route
 		workflowId := vars["id"]
 
 		options := client.StartWorkflowOptions{
-			ID:                                       workflowId,
-			TaskQueue:                                deps.Config.Temporal.Worker.TaskQueue,
-			WorkflowIDReusePolicy:                    enums.WORKFLOW_ID_REUSE_POLICY_ALLOW_DUPLICATE_FAILED_ONLY,
-			WorkflowIDConflictPolicy:                 enums.WORKFLOW_ID_CONFLICT_POLICY_FAIL,
+			ID:        workflowId,
+			TaskQueue: deps.Config.Temporal.Worker.TaskQueue,
+			// This configures how to deal with prior attempts of an Onboarding.
+			// We want to allow a "do over" of the Onboarding only if the prior attempts failed.
+			WorkflowIDReusePolicy: enums.WORKFLOW_ID_REUSE_POLICY_ALLOW_DUPLICATE_FAILED_ONLY,
+			// This configures how to deal with any Running Onboarding currently in progress.
+			// We want to fail if already in flight.
+			WorkflowIDConflictPolicy: enums.WORKFLOW_ID_CONFLICT_POLICY_FAIL,
+			// This makes explicit when our Onboarding could not be started due to the configuration above.
+			// Otherwise, this could silently fail and it becomes harder to track down.
 			WorkflowExecutionErrorWhenAlreadyStarted: true,
 		}
 
@@ -178,7 +178,7 @@ func createV1Router(ctx context.Context, deps *V1Dependencies, router *mux.Route
 			Id:                       workflowId,
 			Value:                    body.Value,
 			CompletionTimeoutSeconds: deps.Config.Onboardings.CompletionTimeoutSeconds,
-			DeputyOwnerEmail:         "",
+			DeputyOwnerEmail:         body.DeputyOwnerEmail,
 			SkipApproval:             false,
 			Timestamp:                timestamppb.New(time.Now().UTC()),
 		}
