@@ -155,7 +155,9 @@ func OnboardEntity(ctx workflow.Context, args *workflowsv2.OnboardEntityRequest)
 		RetryPolicy:         &temporal.RetryPolicy{MaximumAttempts: 2}})
 
 	notifyVersion := workflow.GetVersion(ctx, "notifyOnboardEntityCompleted", workflow.DefaultVersion, 0)
+
 	if notifyVersion == workflow.DefaultVersion {
+		// this is the old execution so get out of here
 		return nil
 	}
 	if err = workflow.ExecuteActivity(notificationCtx, "NotifyOnboardEntityCompleted", &commandsv2.NotifyOnboardEntityCompletedRequest{

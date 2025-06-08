@@ -11,7 +11,7 @@ import (
 type ScaffoldActivityTestSuite struct {
 	suite.Suite
 	testsuite.WorkflowTestSuite
-	env *testsuite.TestWorkflowEnvironment
+	env *testsuite.TestActivityEnvironment
 }
 
 // SetupSuite https://pkg.go.dev/github.com/stretchr/testify/suite#SetupAllSuite
@@ -23,7 +23,7 @@ func (s *ScaffoldActivityTestSuite) SetupSuite() {
 // CAREFUL not to put this `env` inside the SetupSuite or else you will
 // get interleaved test times between parallel tests
 func (s *ScaffoldActivityTestSuite) SetupTest() {
-	s.env = s.NewTestWorkflowEnvironment()
+	s.env = s.NewTestActivityEnvironment()
 }
 
 // BeforeTest https://pkg.go.dev/github.com/stretchr/testify/suite#BeforeTest

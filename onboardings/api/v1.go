@@ -177,10 +177,11 @@ func createV1Router(ctx context.Context, deps *V1Dependencies, router *mux.Route
 		params := &workflowsv1.OnboardEntityRequest{
 			Id:                       workflowId,
 			Value:                    body.Value,
-			CompletionTimeoutSeconds: deps.Config.Onboardings.CompletionTimeoutSeconds,
-			DeputyOwnerEmail:         body.DeputyOwnerEmail,
-			SkipApproval:             false,
-			Timestamp:                timestamppb.New(time.Now().UTC()),
+			CompletionTimeoutSeconds: 60,
+			//CompletionTimeoutSeconds: deps.Config.Onboardings.CompletionTimeoutSeconds,
+			DeputyOwnerEmail: body.DeputyOwnerEmail,
+			SkipApproval:     false,
+			Timestamp:        timestamppb.New(time.Now().UTC()),
 		}
 
 		_, err := deps.Clients.Temporal.ExecuteWorkflow(r.Context(), options, onboardings.TypeWorkflowOnboardEntity, params)

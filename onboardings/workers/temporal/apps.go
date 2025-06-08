@@ -6,7 +6,7 @@ import (
 	"github.com/temporalio/temporal-jumpstart-golang/onboardings/clients/snailforce"
 	"github.com/temporalio/temporal-jumpstart-golang/onboardings/config"
 	"github.com/temporalio/temporal-jumpstart-golang/onboardings/domain/workflows/onboardings"
-	"github.com/temporalio/temporal-jumpstart-golang/onboardings/domain/workflows/onboardings/v1"
+	"github.com/temporalio/temporal-jumpstart-golang/onboardings/domain/workflows/onboardings/latest"
 	"go.temporal.io/sdk/contrib/resourcetuner"
 	"go.temporal.io/sdk/worker"
 	"go.temporal.io/sdk/workflow"
@@ -62,8 +62,9 @@ func RegisterAppsComponents(ctx context.Context,
 	if err != nil {
 		return err
 	}
-	worker.RegisterWorkflowWithOptions(v1.OnboardEntity,
+	worker.RegisterWorkflowWithOptions(latest.OnboardEntity,
 		workflow.RegisterOptions{Name: onboardings.TypeWorkflowOnboardEntity})
+
 	worker.RegisterActivity(acts)
 	return nil
 }
