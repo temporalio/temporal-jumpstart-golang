@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	prom "github.com/prometheus/client_golang/prometheus"
-	"github.com/temporalio/temporal-jumpstart-golang/app/config"
 	"github.com/uber-go/tally/v4"
 	"github.com/uber-go/tally/v4/prometheus"
 	sdktally "go.temporal.io/sdk/contrib/tally"
@@ -12,7 +11,7 @@ import (
 	"time"
 )
 
-func NewScope(ctx context.Context, cfg *config.Config, root tally.Scope, opts ...ScopeOption) (tally.Scope, error) {
+func NewScope(_ context.Context, root tally.Scope, opts ...ScopeOption) (tally.Scope, error) {
 	scope := sdktally.NewPrometheusNamingScope(root)
 	for _, opt := range opts {
 		scope = opt(root)
@@ -20,7 +19,7 @@ func NewScope(ctx context.Context, cfg *config.Config, root tally.Scope, opts ..
 	return scope, nil
 
 }
-func NewReporter(ctx context.Context, cfg *config.Config, opts ...ReporterOption) (prometheus.Reporter, error) {
+func NewReporter(ctx context.Context, opts ...ReporterOption) (prometheus.Reporter, error) {
 	c := &prometheus.Configuration{}
 	for _, opt := range opts {
 		opt(c)
@@ -45,7 +44,7 @@ func NewReporter(ctx context.Context, cfg *config.Config, opts ...ReporterOption
 	}
 	return reporter, nil
 }
-func NewRootScope(ctx context.Context, cfg *config.Config, opts ...RootOption) (tally.Scope, error) {
+func NewRootScope(ctx context.Context, opts ...RootOption) (tally.Scope, error) {
 
 	c := &tally.ScopeOptions{}
 	for _, opt := range opts {
@@ -53,7 +52,7 @@ func NewRootScope(ctx context.Context, cfg *config.Config, opts ...RootOption) (
 	}
 	if c.CachedReporter == nil {
 		var rerr error
-		c.CachedReporter, rerr = NewReporter(ctx, cfg)
+		c.CachedReporter, rerr = NewReporter(ctx)
 		if rerr != nil {
 			return nil, fmt.Errorf("error creating default prometheus reporter %w", rerr)
 		}

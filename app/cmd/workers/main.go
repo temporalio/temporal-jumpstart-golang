@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"github.com/temporalio/temporal-jumpstart-golang/app/clients"
+	"github.com/temporalio/temporal-jumpstart-golang/app/clients/temporal"
 	"github.com/temporalio/temporal-jumpstart-golang/app/instrumentation/prometheus"
 	"github.com/uber-go/tally/v4"
 	"log"
@@ -87,8 +88,6 @@ func runWorkers(args WorkerArgs) {
 	cfg := config.MustNewConfig(args.ConfigDir, args.Env)
 	ctx := context.Background()
 
-	c := clients.MustNewClients(ctx, cfg)
-
 	targets, err := parseWorkerTargets(args.NamespacedTaskQueues)
 	if err != nil {
 		log.Fatalf("Failed to parse worker targets: %v", err)
@@ -96,6 +95,12 @@ func runWorkers(args WorkerArgs) {
 
 	slog.Info("Starting workers", "targets", targets)
 	rootScope := setupObservability(err, ctx, cfg)
+
+	var clientOpts []clients.Option
+	for _, target := range targets {
+		clientOpts = append(clientOpts, clients.WithTemporalOptions(target.Namespace, temporal.WithRootScope(rootScope)))
+	}
+	c := clients.MustNewClients(ctx, cfg, clientOpts...)
 
 	workerClients, err := worker.NewClients(ctx, cfg, rootScope, targets)
 	if err != nil {
@@ -120,13 +125,12 @@ func runWorkers(args WorkerArgs) {
 }
 
 func setupObservability(err error, ctx context.Context, cfg *config.Config) tally.Scope {
-	reporter, err := prometheus.NewReporter(ctx, cfg,
-		prometheus.WithListenAddress(cfg.Temporal.Prometheus.Address))
+	reporter, err := prometheus.NewReporter(ctx, prometheus.WithListenAddress(cfg.Temporal.Prometheus.Address))
 	if err != nil {
 		log.Fatalf("Failed to create prometheus reporter: %v", err)
 	}
 
-	rootScope, err := prometheus.NewRootScope(ctx, cfg, prometheus.WithReporter(reporter))
+	rootScope, err := prometheus.NewRootScope(ctx, prometheus.WithReporter(reporter))
 	if err != nil {
 		log.Fatalf("Failed to create prometheus root scope: %v", err)
 	}

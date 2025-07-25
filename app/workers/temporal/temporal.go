@@ -39,10 +39,10 @@ func NewClients(ctx context.Context,
 			return nil, fmt.Errorf("task queue '%s' not found in config", ntq.TaskQueue)
 		}
 		for i := 0; i < tqcfg.WorkerCount; i++ {
-			scope, serr := prometheus.NewScope(ctx, cfg, rootScope, prometheus.WithTags(
+			scope, serr := prometheus.NewScope(ctx, rootScope, prometheus.WithTags(
 				map[string]string{
 					// used for disambiguating metrics
-					"client_id": fmt.Sprintf("client-%d", i),
+					"worker_client_id": fmt.Sprintf("client-%d", i),
 				}))
 			if serr != nil {
 				return nil, fmt.Errorf("failed to create prometheus scope: %w", serr)

@@ -5,6 +5,7 @@ import (
 	"github.com/temporalio/temporal-jumpstart-golang/app/clients/temporal"
 	"github.com/temporalio/temporal-jumpstart-golang/app/config"
 	"log"
+	"log/slog"
 	"sync"
 )
 
@@ -39,10 +40,13 @@ func NewClients(ctx context.Context,
 		// create N Workflow Clients
 		if nscfg.Workflows != nil {
 			for i := 0; i < nscfg.Workflows.ClientCount; i++ {
-				c, err := temporal.NewClient(ctx, ns, cfg.Temporal, i)
+				clientOpts := out.temporalOptions[ns]
+				c, err := temporal.NewClient(ctx, ns, cfg.Temporal, i, clientOpts...)
 				if err != nil {
+					return nil, err
 				}
 				out.temporals[ns] = c
+				slog.Info("connected workflow client", "namespace", ns, "client", i)
 			}
 		}
 	}

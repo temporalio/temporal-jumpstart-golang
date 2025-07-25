@@ -5,14 +5,18 @@ import (
 	"crypto/tls"
 	"fmt"
 	"github.com/temporalio/temporal-jumpstart-golang/app/config"
+	"github.com/temporalio/temporal-jumpstart-golang/app/instrumentation/prometheus"
+	"github.com/uber-go/tally/v4"
 	sdkclient "go.temporal.io/sdk/client"
+	sdktally "go.temporal.io/sdk/contrib/tally"
 	"log/slog"
 	"os"
 )
 
 type Client struct {
 	sdkclient.Client
-	Options sdkclient.Options
+	Options   sdkclient.Options
+	rootScope tally.Scope
 }
 
 func GetIdentity(taskQueue string, index int) string {
@@ -59,9 +63,10 @@ func NewClient(ctx context.Context,
 	index int,
 	options ...Option) (*Client, error) {
 
+	result := &Client{}
 	opts := &sdkclient.Options{}
 	for _, option := range options {
-		option(opts)
+		option(result, opts)
 	}
 	nsCfg, exists := cfg.Namespaces[namespace]
 	if !exists {
@@ -86,6 +91,18 @@ func NewClient(ctx context.Context,
 			opts.HeadersProvider = &Headers{namespace: namespace, nsCfg: nsCfg}
 		}
 	}
+	if result.rootScope != nil {
+		// if a rootScope was passed in as an option, tag this client so N clients can report metrics
+		scope, err := prometheus.NewScope(ctx, result.rootScope, prometheus.WithTags(
+			map[string]string{
+				// used for disambiguating metrics
+				"wf_client_id": fmt.Sprintf("client-%d", index),
+			}))
+		if err != nil {
+			return nil, fmt.Errorf("failed to create prometheus scope: %w", err)
+		}
+		opts.MetricsHandler = sdktally.NewMetricsHandler(scope)
+	}
 
 	slog.Info("creating temporal client",
 		"hostport", opts.HostPort,
@@ -97,7 +114,8 @@ func NewClient(ctx context.Context,
 	if err != nil {
 		return nil, fmt.Errorf("failed to new temporal client %w", err)
 	}
-
+	result.Client = inner
+	result.Options = *opts
 	slog.Info("Connected to Temporal server", "address", opts.HostPort)
-	return &Client{Client: inner, Options: *opts}, nil
+	return result, nil
 }
