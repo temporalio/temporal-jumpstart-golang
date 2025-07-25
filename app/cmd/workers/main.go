@@ -3,9 +3,9 @@ package main
 import (
 	"context"
 	"fmt"
+	"github.com/temporalio/temporal-jumpstart-golang/app/clients"
 	"github.com/temporalio/temporal-jumpstart-golang/app/instrumentation/prometheus"
 	"github.com/uber-go/tally/v4"
-	sdkworker "go.temporal.io/sdk/worker"
 	"log"
 	"log/slog"
 	"os"
@@ -87,6 +87,8 @@ func runWorkers(args WorkerArgs) {
 	cfg := config.MustNewConfig(args.ConfigDir, args.Env)
 	ctx := context.Background()
 
+	c := clients.MustNewClients(ctx, cfg)
+
 	targets, err := parseWorkerTargets(args.NamespacedTaskQueues)
 	if err != nil {
 		log.Fatalf("Failed to parse worker targets: %v", err)
@@ -106,7 +108,7 @@ func runWorkers(args WorkerArgs) {
 			ShutdownTimeout: 15 * time.Second,
 			WorkerType:      "workers",
 		},
-		&NullBuilder{},
+		&NullBuilder{Clients: c},
 	)
 
 	if err = host.Run(ctx, cfg, workerClients...); err != nil {
@@ -115,13 +117,6 @@ func runWorkers(args WorkerArgs) {
 	}
 
 	slog.Info("Workers completed")
-}
-
-type NullBuilder struct {
-}
-
-func (n *NullBuilder) Build(ctx context.Context, cfg *config.Config, target *worker.WorkerClient, options sdkworker.Options) (sdkworker.Worker, error) {
-	return sdkworker.New(target.TemporalClient(), target.TaskQueue, options), nil
 }
 
 func setupObservability(err error, ctx context.Context, cfg *config.Config) tally.Scope {

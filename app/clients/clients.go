@@ -49,7 +49,7 @@ func NewClients(ctx context.Context,
 	return out, nil
 }
 
-func MustGetClients(
+func MustNewClients(
 	ctx context.Context,
 	cfg *config.Config,
 	opts ...Option) *Clients {
