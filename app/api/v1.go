@@ -7,6 +7,7 @@ import (
 	"github.com/temporalio/temporal-jumpstart-golang/app/api/encoding"
 	"github.com/temporalio/temporal-jumpstart-golang/app/api/messages"
 	"github.com/temporalio/temporal-jumpstart-golang/app/clients"
+	"github.com/temporalio/temporal-jumpstart-golang/app/clients/temporal"
 	"github.com/temporalio/temporal-jumpstart-golang/app/config"
 	"github.com/temporalio/temporal-jumpstart-golang/app/domain/workflows"
 	"go.temporal.io/api/enums/v1"
@@ -20,18 +21,19 @@ import (
 )
 
 type V1Dependencies struct {
-	Clients *clients.Clients
-	Config  *config.Config
+	Clients        *clients.Clients
+	Config         *config.Config
+	TemporalClient *temporal.Client
 }
 
-func createV1Router(ctx context.Context, deps *V1Dependencies, router *mux.Router) *mux.Router {
+func createV1Router(_ context.Context, deps *V1Dependencies, router *mux.Router) *mux.Router {
 
 	router.HandleFunc("/pings/{id}", func(w http.ResponseWriter, r *http.Request) {
 
 		vars := mux.Vars(r)
 		workflowId := vars["id"]
 
-		result, err := deps.Clients.Temporal.QueryWorkflow(
+		result, err := deps.TemporalClient.QueryWorkflow(
 			r.Context(),
 			workflowId,
 			"",
@@ -70,13 +72,13 @@ func createV1Router(ctx context.Context, deps *V1Dependencies, router *mux.Route
 
 		options := client.StartWorkflowOptions{
 			ID:                                       workflowId,
-			TaskQueue:                                deps.Config.Temporal.Worker.TaskQueue,
+			TaskQueue:                                "default",
 			WorkflowIDReusePolicy:                    enums.WORKFLOW_ID_REUSE_POLICY_ALLOW_DUPLICATE_FAILED_ONLY,
 			WorkflowIDConflictPolicy:                 enums.WORKFLOW_ID_CONFLICT_POLICY_FAIL,
 			WorkflowExecutionErrorWhenAlreadyStarted: true,
 		}
 
-		wfRun, err := deps.Clients.Temporal.ExecuteWorkflow(r.Context(), options, workflows.Ping, body.Ping)
+		wfRun, err := deps.TemporalClient.ExecuteWorkflow(r.Context(), options, workflows.Ping, body.Ping)
 		if err != nil {
 			var alreadyStartedErr *serviceerror.WorkflowExecutionAlreadyStarted
 			if errors.As(err, &alreadyStartedErr) {

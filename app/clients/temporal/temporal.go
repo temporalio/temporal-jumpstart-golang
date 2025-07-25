@@ -19,22 +19,12 @@ type Client struct {
 	rootScope tally.Scope
 }
 
+func (c *Client) TemporalClient() sdkclient.Client {
+	return c.Client
+}
+
 func GetIdentity(taskQueue string, index int) string {
 	return fmt.Sprintf("%d@%s@%s-%d", os.Getpid(), getHostName(), taskQueue, index)
-}
-
-type Clients struct {
-	Client        sdkclient.Client
-	Config        *config.Config
-	ClientOptions sdkclient.Options
-}
-
-func (c *Clients) Close() error {
-	if c.Client != nil {
-		c.Client.Close()
-	}
-
-	return nil
 }
 
 func getHostName() string {

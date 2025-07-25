@@ -56,7 +56,7 @@ func GetWorkflowHistory(ctx context.Context,
 	return result, nil
 }
 
-// TestEncodedValue simplifies testing with this result from the Temporal Client
+// TestEncodedValue simplifies testing with this result from the Temporal TemporalClient
 type TestEncodedValue struct {
 	Value interface{}
 }

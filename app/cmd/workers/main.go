@@ -101,7 +101,7 @@ func runWorkers(args WorkerArgs) {
 		clientOpts = append(clientOpts, clients.WithTemporalOptions(target.Namespace, temporal.WithRootScope(rootScope)))
 	}
 	c := clients.MustNewClients(ctx, cfg, clientOpts...)
-
+	slog.Info("Connected to clients", "clients", c.Temporals())
 	workerClients, err := worker.NewClients(ctx, cfg, rootScope, targets)
 	if err != nil {
 		log.Fatalf("Failed to connect worker clients: %v", err)
@@ -113,7 +113,7 @@ func runWorkers(args WorkerArgs) {
 			ShutdownTimeout: 15 * time.Second,
 			WorkerType:      "workers",
 		},
-		&NullBuilder{Clients: c},
+		&DefaultBuilder{},
 	)
 
 	if err = host.Run(ctx, cfg, workerClients...); err != nil {

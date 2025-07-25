@@ -7,19 +7,21 @@ import (
 	appclients "github.com/temporalio/temporal-jumpstart-golang/app/clients"
 	"github.com/temporalio/temporal-jumpstart-golang/app/config"
 	"log"
+	"log/slog"
 	"net/http"
 	"net/url"
-	"os"
 )
 
 func main() {
 
 	ctx := context.Background()
-	cfg := config.MustNewConfig(os.Getenv("CONFIG_DIR"), os.Getenv("ENV"))
+	cfg := config.MustNewConfig("config", "default")
 	clients, err := appclients.NewClients(ctx, cfg)
 	if err != nil {
 		log.Fatal(err)
 	}
+	slog.Info("starting api on", "url", cfg.API.URL)
+
 	parsedUrl, err := url.Parse(cfg.API.URL)
 	if err != nil {
 		log.Fatal(err)

@@ -21,7 +21,6 @@ type Clients struct {
 func (c *Clients) Temporals() map[string][]*temporal.Client {
 	return c.temporals
 }
-
 func (c *Clients) Close() {
 	for _, cl := range c.temporals {
 		for _, t := range cl {

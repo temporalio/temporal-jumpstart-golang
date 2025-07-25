@@ -19,7 +19,7 @@ func RandomString() string {
 // GetFunctionName shamelessly lifted from sdk-go
 var GetFunctionName = workflows.GetFunctionName
 
-// TestEncodedValue simplifies testing with this result from the Temporal Client
+// TestEncodedValue simplifies testing with this result from the Temporal TemporalClient
 type TestEncodedValue struct {
 	Value interface{}
 }
