@@ -5,19 +5,18 @@ import (
 	"crypto/tls"
 	"fmt"
 	"github.com/temporalio/temporal-jumpstart-golang/app/config"
-	"github.com/uber-go/tally/v4"
 	sdkclient "go.temporal.io/sdk/client"
-	sdktally "go.temporal.io/sdk/contrib/tally"
+	"log/slog"
 	"os"
 )
 
-func GetIdentity(taskQueue string) string {
-	return fmt.Sprintf("%d@%s@%s", os.Getpid(), getHostName(), taskQueue)
-
+type Client struct {
+	sdkclient.Client
+	Options sdkclient.Options
 }
 
-func NewMetricsHandler(scope tally.Scope) sdkclient.MetricsHandler {
-	return sdktally.NewMetricsHandler(scope)
+func GetIdentity(taskQueue string, index int) string {
+	return fmt.Sprintf("%d@%s@%s-%d", os.Getpid(), getHostName(), taskQueue, index)
 }
 
 type Clients struct {
@@ -42,50 +41,63 @@ func getHostName() string {
 	return hostName
 }
 
+type Headers struct {
+	namespace string
+	nsCfg     *config.NamespaceConfig
+}
+
+func (A Headers) GetHeaders(ctx context.Context) (map[string]string, error) {
+	return map[string]string{
+		"temporal-namespace": A.namespace,
+	}, nil
+}
+
 // NewClient creates the temporal client
-func NewClient(ctx context.Context, cfg *config.Config) (sdkclient.Client, error) {
+func NewClient(ctx context.Context,
+	namespace string,
+	cfg *config.TemporalConfig,
+	index int,
+	options ...Option) (*Client, error) {
 
-	opts := sdkclient.Options{}
-	var cert tls.Certificate
-
+	opts := &sdkclient.Options{}
+	for _, option := range options {
+		option(opts)
+	}
+	nsCfg, exists := cfg.Namespaces[namespace]
+	if !exists {
+		return nil, fmt.Errorf("namespace %s config not found", namespace)
+	}
 	// map
 	if opts.HostPort == "" {
-		opts.HostPort = cfg.Temporal.Connection.Target
+		opts.HostPort = nsCfg.Connection.Target
 	}
 	if opts.Namespace == "" {
-		opts.Namespace = cfg.Temporal.Connection.Namespace
+		opts.Namespace = namespace
 	}
 	if opts.Identity == "" {
 		// same behavior as SDK
-		opts.Identity = GetIdentity("")
+		opts.Identity = GetIdentity("", index)
 	}
-
-	if cfg.Temporal.Connection.MTLS != nil &&
-		cfg.Temporal.Connection.MTLS.CertChainFile != "" &&
-		cfg.Temporal.Connection.MTLS.KeyFile != "" {
-		var err error
-
-		cert, err = tls.LoadX509KeyPair(cfg.Temporal.Connection.MTLS.CertChainFile, cfg.Temporal.Connection.MTLS.KeyFile)
-		if err != nil {
-			return nil, fmt.Errorf("failed to load TLS from files: %w", err)
-		}
-	} else if cfg.Temporal.Connection.MTLS != nil &&
-		len(cfg.Temporal.Connection.MTLS.CertChain) > 0 &&
-		len(cfg.Temporal.Connection.MTLS.Key) > 0 {
-		var err error
-		cert, err = tls.X509KeyPair(cfg.Temporal.Connection.MTLS.CertChain, cfg.Temporal.Connection.MTLS.Key)
-		if err != nil {
-			return nil, fmt.Errorf("failed to load Cloud TLS from data: %w", err)
+	if nsCfg.Connection.MTLS == nil && nsCfg.Connection.APIKey != "" {
+		// api key connection setup
+		opts.ConnectionOptions.TLS = &tls.Config{}
+		if nsCfg.Connection.APIKey != "" {
+			opts.Credentials = sdkclient.NewAPIKeyStaticCredentials(nsCfg.Connection.APIKey)
+			opts.HeadersProvider = &Headers{namespace: namespace, nsCfg: nsCfg}
 		}
 	}
 
-	if len(cert.Certificate) > 0 {
-		opts.ConnectionOptions.TLS = &tls.Config{Certificates: []tls.Certificate{cert}}
-	}
+	slog.Info("creating temporal client",
+		"hostport", opts.HostPort,
+		"namespace", opts.Namespace,
+		"with api-key", opts.Credentials != nil,
+		"identity", opts.Identity)
 
-	result, err := sdkclient.Dial(opts)
+	inner, err := sdkclient.Dial(*opts)
 	if err != nil {
 		return nil, fmt.Errorf("failed to new temporal client %w", err)
 	}
-	return result, nil
+
+	slog.Info("Connected to Temporal server", "address", opts.HostPort)
+	return &Client{Client: inner, Options: *opts}, nil
 }

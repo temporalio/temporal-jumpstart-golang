@@ -63,6 +63,7 @@ type TemporalConnection struct {
 	Namespace string
 	Target    string
 	MTLS      *MTLSConfig
+	APIKey    string
 }
 
 type TemporalConfig struct {
