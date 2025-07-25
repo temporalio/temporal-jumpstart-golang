@@ -1,6 +1,8 @@
 package clients
 
-import "github.com/temporalio/temporal-jumpstart-golang/app/clients/temporal"
+import (
+	"github.com/temporalio/temporal-jumpstart-golang/app/clients/temporal"
+)
 
 type Option func(*Clients)
 

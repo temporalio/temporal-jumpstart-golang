@@ -1,0 +1,5 @@
+api:
+  url: "http://localhost:4000/api"
+  mtls:
+    cert_chain_file: localhost-client.pem
+    key_file: localhost-client-key.pem

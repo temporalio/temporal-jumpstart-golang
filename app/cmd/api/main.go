@@ -15,6 +15,7 @@ import (
 func main() {
 
 	ctx := context.Background()
+	// TODO pass in env params with defaults of `default`
 	cfg := config.MustNewConfig("config", "default")
 	clients, err := appclients.NewClients(ctx, cfg)
 	if err != nil {

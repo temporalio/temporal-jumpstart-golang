@@ -6,6 +6,7 @@ import (
 	"github.com/temporalio/temporal-jumpstart-golang/app/clients/temporal"
 	"github.com/temporalio/temporal-jumpstart-golang/app/config"
 	"github.com/temporalio/temporal-jumpstart-golang/app/instrumentation/prometheus"
+	temporal2 "github.com/temporalio/temporal-jumpstart-golang/onboardings/clients/temporal"
 	"github.com/uber-go/tally/v4"
 	sdkclient "go.temporal.io/sdk/client"
 )
@@ -47,8 +48,8 @@ func NewClients(ctx context.Context,
 			if serr != nil {
 				return nil, fmt.Errorf("failed to create prometheus scope: %w", serr)
 			}
-			opts := []temporal.Option{
-				temporal.WithMetricsScope(scope),
+			opts := []temporal2.Option{
+				temporal2.WithMetricsScope(scope),
 			}
 			c, cerr := temporal.NewClient(ctx, ntq.Namespace, cfg.Temporal, i, opts...)
 			if cerr != nil {

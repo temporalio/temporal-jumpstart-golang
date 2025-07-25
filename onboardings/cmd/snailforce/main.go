@@ -1,18 +1,19 @@
 package main
 
 import (
-	"fmt"
 	"github.com/temporalio/temporal-jumpstart-golang/onboardings/config"
 	"github.com/temporalio/temporal-jumpstart-golang/onboardings/generated/snailforce/v1/snailforcev1connect"
 	"github.com/temporalio/temporal-jumpstart-golang/onboardings/snailforce"
 	"golang.org/x/net/http2"
 	"golang.org/x/net/http2/h2c"
 	"log"
+	"log/slog"
 	"net/http"
+	"net/url"
 )
 
 func main() {
-	cfg := config.MustNewConfig()
+	cfg := config.MustNewConfig("config", "default")
 	mux := http.NewServeMux()
 	// The generated constructors return a path and a plain net/http
 	// handler.
@@ -24,9 +25,13 @@ func main() {
 			--header 'accept: application/json \
 			--data '{"id":"foo","value":"bar"}'
 	*/
-	fmt.Println("Starting Snailforce @", cfg.Snailforce.URL)
-	err := http.ListenAndServe(
-		cfg.Snailforce.URL.Host,
+	slog.Info("Starting Snailforce @", "url", cfg.Snailforce.URL)
+	parsedUrl, err := url.Parse(cfg.Snailforce.URL)
+	if err != nil {
+		log.Fatal(err)
+	}
+	err = http.ListenAndServe(
+		parsedUrl.Host,
 		// For gRPC clients, it's convenient to support HTTP/2 without TLS. You can
 		// avoid x/net/http2 by using http.ListenAndServeTLS.
 		h2c.NewHandler(mux, &http2.Server{}),

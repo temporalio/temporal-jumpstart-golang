@@ -6,10 +6,15 @@ import (
 	sdktally "go.temporal.io/sdk/contrib/tally"
 )
 
-type Option func(*sdkclient.Options)
+type Option func(*Client, *sdkclient.Options)
 
+func WithRootScope(scope tally.Scope) Option {
+	return func(c *Client, _ *sdkclient.Options) {
+		c.rootScope = scope
+	}
+}
 func WithMetricsScope(scope tally.Scope) Option {
-	return func(opts *sdkclient.Options) {
+	return func(c *Client, opts *sdkclient.Options) {
 		opts.MetricsHandler = sdktally.NewMetricsHandler(scope)
 	}
 }

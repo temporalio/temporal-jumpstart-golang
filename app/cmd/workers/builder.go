@@ -4,8 +4,8 @@ import (
 	"context"
 	"github.com/temporalio/temporal-jumpstart-golang/app/clients"
 	"github.com/temporalio/temporal-jumpstart-golang/app/config"
+	"github.com/temporalio/temporal-jumpstart-golang/app/domain/workflows"
 	worker "github.com/temporalio/temporal-jumpstart-golang/app/workers/temporal"
-	"github.com/temporalio/temporal-jumpstart-golang/onboardings/domain/workflows"
 	sdkworker "go.temporal.io/sdk/worker"
 )
 
