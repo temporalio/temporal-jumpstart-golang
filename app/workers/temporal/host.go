@@ -58,6 +58,9 @@ func NewWorkerHost(ctx context.Context,
 	if config.ShutdownTimeout == 0 {
 		config.ShutdownTimeout = 10 * time.Second
 	}
+	if builder == nil {
+		panic("builder is required")
+	}
 
 	return &WorkerHost{
 		config:  config,
@@ -121,7 +124,7 @@ func (wh *WorkerHost) Run(ctx context.Context,
 				"failed to create %s worker %d: %w",
 				wh.config.WorkerType, i, err)
 		}
-		workers[i] = w
+		workers = append(workers, w)
 	}
 
 	// Create interrupt channel for temporal workers

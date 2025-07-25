@@ -7,6 +7,7 @@ import (
 	"github.com/temporalio/temporal-jumpstart-golang/app/config"
 	"github.com/temporalio/temporal-jumpstart-golang/app/instrumentation/prometheus"
 	"github.com/uber-go/tally/v4"
+	sdkclient "go.temporal.io/sdk/client"
 )
 
 type WorkerTarget struct {
@@ -16,6 +17,10 @@ type WorkerTarget struct {
 type WorkerClient struct {
 	WorkerTarget
 	Client *temporal.Client
+}
+
+func (w *WorkerClient) TemporalClient() sdkclient.Client {
+	return w.Client.Client
 }
 
 func NewClients(ctx context.Context,

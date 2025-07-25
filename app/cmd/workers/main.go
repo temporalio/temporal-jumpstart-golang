@@ -49,7 +49,7 @@ var runCmd = &cobra.Command{
 }
 
 func init() {
-	runCmd.Flags().StringSliceP("namespaced-task-queue", "ntq", []string{"default:default"}, "Namespaced task queues in format namespace:taskqueue (can specify multiple)")
+	runCmd.Flags().StringSliceP("namespaced-task-queue", "n", []string{"default:default"}, "Namespaced task queues in format namespace:taskqueue (can specify multiple)")
 	runCmd.Flags().StringP("environment", "e", "default", "Environment")
 	runCmd.Flags().StringP("config-dir", "c", "config", "Directory where config files are found")
 
@@ -106,7 +106,7 @@ func runWorkers(args WorkerArgs) {
 			ShutdownTimeout: 15 * time.Second,
 			WorkerType:      "workers",
 		},
-		nil,
+		&NullBuilder{},
 	)
 
 	if err = host.Run(ctx, cfg, workerClients...); err != nil {
@@ -121,7 +121,7 @@ type NullBuilder struct {
 }
 
 func (n *NullBuilder) Build(ctx context.Context, cfg *config.Config, target *worker.WorkerClient, options sdkworker.Options) (sdkworker.Worker, error) {
-	return sdkworker.New(target.Client, target.TaskQueue, options), nil
+	return sdkworker.New(target.TemporalClient(), target.TaskQueue, options), nil
 }
 
 func setupObservability(err error, ctx context.Context, cfg *config.Config) tally.Scope {
