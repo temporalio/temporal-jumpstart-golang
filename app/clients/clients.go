@@ -14,28 +14,32 @@ var once sync.Once
 var oneClients *Clients
 
 type Clients struct {
-	temporals           map[string]*temporal.Client
-	temporalOptions     map[string][]temporal.Option
-	temporalClientCount int
+	temporals       map[string][]*temporal.Client
+	temporalOptions map[string][]temporal.Option
 }
 
-func (c *Clients) Temporals() map[string]*temporal.Client {
+func (c *Clients) Temporals() map[string][]*temporal.Client {
 	return c.temporals
 }
 
 func (c *Clients) Close() {
-	for _, t := range c.temporals {
-		t.Close()
+	for _, cl := range c.temporals {
+		for _, t := range cl {
+			t.Close()
+		}
 	}
 }
 
 func NewClients(ctx context.Context,
 	cfg *config.Config, opts ...Option) (*Clients, error) {
-	out := &Clients{}
+	out := &Clients{
+		temporalOptions: make(map[string][]temporal.Option),
+		temporals:       make(map[string][]*temporal.Client),
+	}
 	for _, opt := range opts {
 		opt(out)
 	}
-	out.temporals = make(map[string]*temporal.Client)
+	out.temporals = make(map[string][]*temporal.Client)
 	for ns, nscfg := range cfg.Temporal.Namespaces {
 		// create N Workflow Clients
 		if nscfg.Workflows != nil {
@@ -45,7 +49,7 @@ func NewClients(ctx context.Context,
 				if err != nil {
 					return nil, err
 				}
-				out.temporals[ns] = c
+				out.temporals[ns] = append(out.temporals[ns], c)
 				slog.Info("connected workflow client", "namespace", ns, "client", i)
 			}
 		}

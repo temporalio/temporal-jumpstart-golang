@@ -42,7 +42,7 @@ func NewClients(ctx context.Context,
 			scope, serr := prometheus.NewScope(ctx, rootScope, prometheus.WithTags(
 				map[string]string{
 					// used for disambiguating metrics
-					"worker_client_id": fmt.Sprintf("client-%d", i),
+					"client_id": fmt.Sprintf("wk-client-%d", i),
 				}))
 			if serr != nil {
 				return nil, fmt.Errorf("failed to create prometheus scope: %w", serr)

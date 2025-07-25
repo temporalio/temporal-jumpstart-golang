@@ -14,10 +14,9 @@ import (
 func NewScope(_ context.Context, root tally.Scope, opts ...ScopeOption) (tally.Scope, error) {
 	scope := sdktally.NewPrometheusNamingScope(root)
 	for _, opt := range opts {
-		scope = opt(root)
+		scope = opt(scope)
 	}
 	return scope, nil
-
 }
 func NewReporter(ctx context.Context, opts ...ReporterOption) (prometheus.Reporter, error) {
 	c := &prometheus.Configuration{}

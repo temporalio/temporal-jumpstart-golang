@@ -96,7 +96,7 @@ func NewClient(ctx context.Context,
 		scope, err := prometheus.NewScope(ctx, result.rootScope, prometheus.WithTags(
 			map[string]string{
 				// used for disambiguating metrics
-				"wf_client_id": fmt.Sprintf("client-%d", index),
+				"client_id": fmt.Sprintf("wf-client-%d", index),
 			}))
 		if err != nil {
 			return nil, fmt.Errorf("failed to create prometheus scope: %w", err)
