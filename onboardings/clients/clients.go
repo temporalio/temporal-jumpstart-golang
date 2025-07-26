@@ -2,8 +2,10 @@ package clients
 
 import (
 	"context"
+	"github.com/temporalio/temporal-jumpstart-golang/onboardings/clients/snailforce"
 	"github.com/temporalio/temporal-jumpstart-golang/onboardings/clients/temporal"
 	"github.com/temporalio/temporal-jumpstart-golang/onboardings/config"
+	"github.com/temporalio/temporal-jumpstart-golang/onboardings/generated/snailforce/v1/snailforcev1connect"
 	"log"
 	"log/slog"
 	"sync"
@@ -16,10 +18,14 @@ var oneClients *Clients
 type Clients struct {
 	temporals       map[string][]*temporal.Client
 	temporalOptions map[string][]temporal.Option
+	snailforce      snailforcev1connect.SnailforceServiceClient
 }
 
 func (c *Clients) Temporals() map[string][]*temporal.Client {
 	return c.temporals
+}
+func (c *Clients) Snailforce() snailforcev1connect.SnailforceServiceClient {
+	return c.snailforce
 }
 func (c *Clients) Close() {
 	for _, cl := range c.temporals {
@@ -52,6 +58,11 @@ func NewClients(ctx context.Context,
 				slog.Info("connected workflow client", "namespace", ns, "client", i)
 			}
 		}
+	}
+	var err error
+	out.snailforce, err = snailforce.NewClient(ctx, cfg, nil)
+	if err != nil {
+		return nil, err
 	}
 	return out, nil
 }

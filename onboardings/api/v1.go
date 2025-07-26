@@ -8,6 +8,7 @@ import (
 	"github.com/temporalio/temporal-jumpstart-golang/onboardings/api/encoding"
 	"github.com/temporalio/temporal-jumpstart-golang/onboardings/api/messages"
 	"github.com/temporalio/temporal-jumpstart-golang/onboardings/clients"
+	"github.com/temporalio/temporal-jumpstart-golang/onboardings/clients/temporal"
 	"github.com/temporalio/temporal-jumpstart-golang/onboardings/config"
 	"github.com/temporalio/temporal-jumpstart-golang/onboardings/domain/workflows"
 	"github.com/temporalio/temporal-jumpstart-golang/onboardings/domain/workflows/onboardings"
@@ -28,8 +29,9 @@ import (
 )
 
 type V1Dependencies struct {
-	Clients *clients.Clients
-	Config  *config.Config
+	Clients        *clients.Clients
+	Config         *config.Config
+	TemporalClient *temporal.Client
 }
 
 func createV1Router(ctx context.Context, deps *V1Dependencies, router *mux.Router) *mux.Router {
@@ -38,8 +40,8 @@ func createV1Router(ctx context.Context, deps *V1Dependencies, router *mux.Route
 
 		vars := mux.Vars(r)
 		workflowId := vars["id"]
-
-		result, err := deps.Clients.Temporal.QueryWorkflow(
+		
+		result, err := deps.TemporalClient.QueryWorkflow(
 			r.Context(),
 			workflowId,
 			"",
@@ -84,7 +86,7 @@ func createV1Router(ctx context.Context, deps *V1Dependencies, router *mux.Route
 			WorkflowExecutionErrorWhenAlreadyStarted: true,
 		}
 
-		wfRun, err := deps.Clients.Temporal.ExecuteWorkflow(r.Context(), options, workflows.Ping, body.Ping)
+		wfRun, err := deps.TemporalClient.ExecuteWorkflow(r.Context(), options, workflows.Ping, body.Ping)
 		if err != nil {
 			var alreadyStartedErr *serviceerror.WorkflowExecutionAlreadyStarted
 			if errors.As(err, &alreadyStartedErr) {
@@ -118,7 +120,7 @@ func createV1Router(ctx context.Context, deps *V1Dependencies, router *mux.Route
 		vars := mux.Vars(r)
 		workflowId := vars["id"]
 
-		result, err := deps.Clients.Temporal.QueryWorkflow(
+		result, err := deps.TemporalClient.QueryWorkflow(
 			r.Context(),
 			workflowId,
 			"",
@@ -184,7 +186,7 @@ func createV1Router(ctx context.Context, deps *V1Dependencies, router *mux.Route
 			Timestamp:        timestamppb.New(time.Now().UTC()),
 		}
 
-		_, err := deps.Clients.Temporal.ExecuteWorkflow(r.Context(), options, onboardings.TypeWorkflowOnboardEntity, params)
+		_, err := deps.TemporalClient.ExecuteWorkflow(r.Context(), options, onboardings.TypeWorkflowOnboardEntity, params)
 		if err != nil {
 			var alreadyStartedErr *serviceerror.WorkflowExecutionAlreadyStarted
 			if errors.As(err, &alreadyStartedErr) {
@@ -214,7 +216,7 @@ func createV1Router(ctx context.Context, deps *V1Dependencies, router *mux.Route
 	}).Methods(http.MethodPut)
 
 	router.HandleFunc("/approvals/{id}", func(w http.ResponseWriter, r *http.Request) {
-		c := deps.Clients.Temporal
+		c := deps.TemporalClient
 		var body *apiv1.ApprovalsPut
 		if err := encoding.DecodeJSONBody(w, r, &body); err != nil {
 			http.Error(w, err.Error(), http.StatusBadRequest)
