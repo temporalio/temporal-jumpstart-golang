@@ -9,7 +9,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/temporalio/temporal-jumpstart-golang/app/api/messages"
-	"github.com/temporalio/temporal-jumpstart-golang/app/clients"
+	"github.com/temporalio/temporal-jumpstart-golang/app/clients/temporal"
 	"github.com/temporalio/temporal-jumpstart-golang/app/config"
 	"github.com/temporalio/temporal-jumpstart-golang/app/domain/workflows"
 	"github.com/temporalio/temporal-jumpstart-golang/app/testhelper"
@@ -55,19 +55,18 @@ func TestV1PutPingAcceptsTheRequestAndReturnsResourceLocation(t *testing.T) {
 	ctx := context.Background()
 	workflowId := testhelper.RandomString()
 	body := messages.PutPing{Ping: testhelper.RandomString()}
-	cfg := &config.Config{
-		Temporal: &config.TemporalConfig{
-			Worker: &config.TemporalWorker{TaskQueue: testhelper.RandomString()},
-		},
-	}
+	cfg := &config.Config{}
 	temporalClient := &testhelper.MockTemporalClient{}
+
+	deps := &V1Dependencies{
+		Config:               cfg,
+		TemporalClient:       &temporal.Client{Client: temporalClient},
+		DiagnosticsTaskQueue: testhelper.RandomString(),
+	}
+
 	temporalClient.On("ExecuteWorkflow", mock.Anything, mock.Anything, mock.Anything, mock.Anything).
 		Return(&TestWorkflowRun{id: workflowId}, nil)
-	c := &clients.Clients{Temporal: temporalClient}
-	sut := createV1Router(ctx, &V1Dependencies{
-		Clients: c,
-		Config:  cfg,
-	}, mux.NewRouter())
+	sut := createV1Router(ctx, deps, mux.NewRouter())
 	testserver := httptest.NewServer(sut)
 	defer testserver.Close()
 	jsonBody, err := json.Marshal(&body)
@@ -92,27 +91,25 @@ func TestV1PutPingStartsAPingWorkflowWithCorrectParams(t *testing.T) {
 	ctx := context.Background()
 	workflowId := testhelper.RandomString()
 	body := messages.PutPing{Ping: testhelper.RandomString()}
-	cfg := &config.Config{
-		Temporal: &config.TemporalConfig{
-			Worker: &config.TemporalWorker{TaskQueue: testhelper.RandomString()},
-		},
-	}
+	cfg := &config.Config{}
 	temporalClient := &testhelper.MockTemporalClient{}
+
+	deps := &V1Dependencies{
+		Config:               cfg,
+		TemporalClient:       &temporal.Client{Client: temporalClient},
+		DiagnosticsTaskQueue: testhelper.RandomString(),
+	}
 	temporalClient.On("ExecuteWorkflow", mock.Anything,
 		mock.MatchedBy(func(opts client.StartWorkflowOptions) bool {
 			return opts.ID == workflowId &&
-				opts.TaskQueue == cfg.Temporal.Worker.TaskQueue &&
+				opts.TaskQueue == deps.DiagnosticsTaskQueue &&
 				opts.WorkflowIDReusePolicy == enums.WORKFLOW_ID_REUSE_POLICY_ALLOW_DUPLICATE_FAILED_ONLY &&
 				opts.WorkflowIDConflictPolicy == enums.WORKFLOW_ID_CONFLICT_POLICY_FAIL
 		}), mock.MatchedBy(func(fn interface{}) bool {
 			funcName, _ := testhelper.GetFunctionName(fn)
 			return funcName == "Ping"
 		}), []interface{}{body.Ping}).Once().Return(&TestWorkflowRun{id: workflowId}, nil)
-	c := &clients.Clients{Temporal: temporalClient}
-	sut := createV1Router(ctx, &V1Dependencies{
-		Clients: c,
-		Config:  cfg,
-	}, mux.NewRouter())
+	sut := createV1Router(ctx, deps, mux.NewRouter())
 	testserver := httptest.NewServer(sut)
 	defer testserver.Close()
 	jsonBody, err := json.Marshal(&body)
@@ -134,26 +131,24 @@ func TestV1GetExistingPingRepliesWithPong(t *testing.T) {
 	A := assert.New(t)
 	ctx := context.Background()
 	workflowId := testhelper.RandomString()
-	cfg := &config.Config{
-		Temporal: &config.TemporalConfig{
-			Worker: &config.TemporalWorker{TaskQueue: testhelper.RandomString()},
-		},
+	cfg := &config.Config{}
+	temporalClient := &testhelper.MockTemporalClient{}
+
+	deps := &V1Dependencies{
+		Config:               cfg,
+		TemporalClient:       &temporal.Client{Client: temporalClient},
+		DiagnosticsTaskQueue: testhelper.RandomString(),
 	}
 	var expect string = "pong: bar"
 	queryResult := &testhelper.TestEncodedValue{Value: &expect}
 
-	temporalClient := &testhelper.MockTemporalClient{}
 	temporalClient.On("QueryWorkflow",
 		mock.Anything,
 		mock.Anything,
 		mock.Anything,
 		workflows.QueryPing,
 		mock.Anything).Return(queryResult, nil)
-	c := &clients.Clients{Temporal: temporalClient}
-	sut := createV1Router(ctx, &V1Dependencies{
-		Clients: c,
-		Config:  cfg,
-	}, mux.NewRouter())
+	sut := createV1Router(ctx, deps, mux.NewRouter())
 	testserver := httptest.NewServer(sut)
 	defer testserver.Close()
 	parsedUrl, err := url.Parse(testserver.URL + "/pings/" + workflowId)
@@ -175,26 +170,24 @@ func TestV1GetGivenExistingPingFetchesCurrentStateOfPing(t *testing.T) {
 	A := assert.New(t)
 	ctx := context.Background()
 	workflowId := testhelper.RandomString()
-	cfg := &config.Config{
-		Temporal: &config.TemporalConfig{
-			Worker: &config.TemporalWorker{TaskQueue: testhelper.RandomString()},
-		},
+	cfg := &config.Config{}
+	temporalClient := &testhelper.MockTemporalClient{}
+
+	deps := &V1Dependencies{
+		Config:               cfg,
+		TemporalClient:       &temporal.Client{Client: temporalClient},
+		DiagnosticsTaskQueue: testhelper.RandomString(),
 	}
 	var expect string = "pong: bar"
 	queryResult := &testhelper.TestEncodedValue{Value: &expect}
 
-	temporalClient := &testhelper.MockTemporalClient{}
 	temporalClient.On("QueryWorkflow",
 		mock.Anything,
 		workflowId,
 		mock.Anything,
 		workflows.QueryPing,
 		mock.Anything).Once().Return(queryResult, nil)
-	c := &clients.Clients{Temporal: temporalClient}
-	sut := createV1Router(ctx, &V1Dependencies{
-		Clients: c,
-		Config:  cfg,
-	}, mux.NewRouter())
+	sut := createV1Router(ctx, deps, mux.NewRouter())
 	testserver := httptest.NewServer(sut)
 	defer testserver.Close()
 	parsedUrl, err := url.Parse(testserver.URL + "/pings/" + workflowId)
@@ -213,24 +206,22 @@ func TestV1GetGivenNonExistingPingReturns404(t *testing.T) {
 	A := assert.New(t)
 	ctx := context.Background()
 	workflowId := testhelper.RandomString()
-	cfg := &config.Config{
-		Temporal: &config.TemporalConfig{
-			Worker: &config.TemporalWorker{TaskQueue: testhelper.RandomString()},
-		},
+	cfg := &config.Config{}
+	temporalClient := &testhelper.MockTemporalClient{}
+
+	deps := &V1Dependencies{
+		Config:               cfg,
+		TemporalClient:       &temporal.Client{Client: temporalClient},
+		DiagnosticsTaskQueue: testhelper.RandomString(),
 	}
 
-	temporalClient := &testhelper.MockTemporalClient{}
 	temporalClient.On("QueryWorkflow",
 		mock.Anything,
 		workflowId,
 		mock.Anything,
 		workflows.QueryPing,
 		mock.Anything).Once().Return(nil, serviceerror.NewNotFound("workflow not found"))
-	c := &clients.Clients{Temporal: temporalClient}
-	sut := createV1Router(ctx, &V1Dependencies{
-		Clients: c,
-		Config:  cfg,
-	}, mux.NewRouter())
+	sut := createV1Router(ctx, deps, mux.NewRouter())
 	testserver := httptest.NewServer(sut)
 	defer testserver.Close()
 	parsedUrl, err := url.Parse(testserver.URL + "/pings/" + workflowId)

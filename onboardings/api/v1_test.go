@@ -9,7 +9,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/temporalio/temporal-jumpstart-golang/onboardings/api/encoding"
-	"github.com/temporalio/temporal-jumpstart-golang/onboardings/clients"
+	"github.com/temporalio/temporal-jumpstart-golang/onboardings/clients/temporal"
 	"github.com/temporalio/temporal-jumpstart-golang/onboardings/config"
 	"github.com/temporalio/temporal-jumpstart-golang/onboardings/domain/workflows"
 	"github.com/temporalio/temporal-jumpstart-golang/onboardings/domain/workflows/onboardings"
@@ -35,20 +35,20 @@ func TestV1StartOnboardingAcceptsTheRequestAndReturnsOnboardingLocation(t *testi
 	ctx := context.Background()
 	workflowId := testhelper.RandomString()
 	body := &apiv1.OnboardingsPut{Value: testhelper.RandomString()}
-	cfg := &config.Config{
-		Temporal: &config.TemporalConfig{
-			Worker: &config.TemporalWorker{TaskQueue: testhelper.RandomString()},
-		},
-		Onboardings: &config.OnboardingsConfig{CompletionTimeoutSeconds: 3000},
-	}
 	temporalClient := &testhelper.MockTemporalClient{}
+	cfg := &config.Config{}
+
+	deps := &V1Dependencies{
+		Config:               cfg,
+		TemporalClient:       &temporal.Client{Client: temporalClient},
+		DiagnosticsTaskQueue: testhelper.RandomString(),
+		OnboardingsTaskQueue: testhelper.RandomString(),
+	}
+
+	sut := createV1Router(ctx, deps, mux.NewRouter())
 	temporalClient.On("ExecuteWorkflow", mock.Anything, mock.Anything, mock.Anything, mock.Anything).
 		Return(&testhelper.TestWorkflowRun{WorkflowID: workflowId}, nil)
-	c := &clients.Clients{Temporal: temporalClient}
-	sut := createV1Router(ctx, &V1Dependencies{
-		Clients: c,
-		Config:  cfg,
-	}, mux.NewRouter())
+
 	testserver := httptest.NewServer(sut)
 	defer testserver.Close()
 	jsonBody, err := json.Marshal(&body)
@@ -79,12 +79,17 @@ func TestV1ApprovalsUpdatesRelatedOnboarding(t *testing.T) {
 			Comment: testhelper.RandomString(),
 		},
 	}
-	cfg := &config.Config{
-		Temporal: &config.TemporalConfig{
-			Worker: &config.TemporalWorker{TaskQueue: testhelper.RandomString()},
-		},
-	}
 	temporalClient := &testhelper.MockTemporalClient{}
+	cfg := &config.Config{}
+
+	deps := &V1Dependencies{
+		Config:               cfg,
+		TemporalClient:       &temporal.Client{Client: temporalClient},
+		DiagnosticsTaskQueue: testhelper.RandomString(),
+		OnboardingsTaskQueue: testhelper.RandomString(),
+	}
+
+	sut := createV1Router(ctx, deps, mux.NewRouter())
 	temporalClient.On("UpdateWorkflow", mock.Anything,
 		mock.MatchedBy(func(opts client.UpdateWorkflowOptions) bool {
 			if len(opts.Args) == 0 {
@@ -102,11 +107,6 @@ func TestV1ApprovalsUpdatesRelatedOnboarding(t *testing.T) {
 				args.Comment == body.Approval.Comment &&
 				opts.WaitForStage == client.WorkflowUpdateStageAccepted
 		})).Once().Return(&testhelper.TestWorkflowUpdateHandle{WorkflowIDToUse: workflowId}, nil)
-	c := &clients.Clients{Temporal: temporalClient}
-	sut := createV1Router(ctx, &V1Dependencies{
-		Clients: c,
-		Config:  cfg,
-	}, mux.NewRouter())
 	testserver := httptest.NewServer(sut)
 	defer testserver.Close()
 	jsonBody, err := json.Marshal(&body)
@@ -135,12 +135,17 @@ func TestV1RejectionUpdatesRelatedOnboarding(t *testing.T) {
 			Comment: testhelper.RandomString(),
 		},
 	}
-	cfg := &config.Config{
-		Temporal: &config.TemporalConfig{
-			Worker: &config.TemporalWorker{TaskQueue: testhelper.RandomString()},
-		},
-	}
 	temporalClient := &testhelper.MockTemporalClient{}
+	cfg := &config.Config{}
+
+	deps := &V1Dependencies{
+		Config:               cfg,
+		TemporalClient:       &temporal.Client{Client: temporalClient},
+		DiagnosticsTaskQueue: testhelper.RandomString(),
+		OnboardingsTaskQueue: testhelper.RandomString(),
+	}
+
+	sut := createV1Router(ctx, deps, mux.NewRouter())
 	temporalClient.On("UpdateWorkflow", mock.Anything,
 		mock.MatchedBy(func(opts client.UpdateWorkflowOptions) bool {
 			if len(opts.Args) == 0 {
@@ -158,11 +163,7 @@ func TestV1RejectionUpdatesRelatedOnboarding(t *testing.T) {
 				args.Comment == body.Approval.Comment &&
 				opts.WaitForStage == client.WorkflowUpdateStageAccepted
 		})).Once().Return(&testhelper.TestWorkflowUpdateHandle{WorkflowIDToUse: workflowId}, nil)
-	c := &clients.Clients{Temporal: temporalClient}
-	sut := createV1Router(ctx, &V1Dependencies{
-		Clients: c,
-		Config:  cfg,
-	}, mux.NewRouter())
+
 	testserver := httptest.NewServer(sut)
 	defer testserver.Close()
 	jsonBody, err := json.Marshal(&body)
@@ -191,18 +192,20 @@ func TestV1InvalidApprovalReturns400(t *testing.T) {
 			Comment: testhelper.RandomString(),
 		},
 	}
-	cfg := &config.Config{
-		Temporal: &config.TemporalConfig{
-			Worker: &config.TemporalWorker{TaskQueue: testhelper.RandomString()},
-		},
-	}
 	temporalClient := &testhelper.MockTemporalClient{}
+	cfg := &config.Config{}
+
+	deps := &V1Dependencies{
+		Config:               cfg,
+		TemporalClient:       &temporal.Client{Client: temporalClient},
+		DiagnosticsTaskQueue: testhelper.RandomString(),
+		OnboardingsTaskQueue: testhelper.RandomString(),
+	}
+
+	sut := createV1Router(ctx, deps, mux.NewRouter())
+
 	temporalClient.On("UpdateWorkflow", mock.Anything, mock.Anything).Times(0)
-	c := &clients.Clients{Temporal: temporalClient}
-	sut := createV1Router(ctx, &V1Dependencies{
-		Clients: c,
-		Config:  cfg,
-	}, mux.NewRouter())
+
 	testserver := httptest.NewServer(sut)
 	defer testserver.Close()
 	jsonBody, err := json.Marshal(&body)
@@ -225,17 +228,24 @@ func TestV1PutOnboardingStartsOnboardEntityWithCorrectParams(t *testing.T) {
 	workflowId := testhelper.RandomString()
 	body := &apiv1.OnboardingsPut{Value: testhelper.RandomString()}
 	cfg := &config.Config{
-		Temporal: &config.TemporalConfig{
-			Worker: &config.TemporalWorker{TaskQueue: testhelper.RandomString()},
-		},
 		Onboardings: &config.OnboardingsConfig{CompletionTimeoutSeconds: 3000},
 	}
 	temporalClient := &testhelper.MockTemporalClient{}
+
+	deps := &V1Dependencies{
+		Config:               cfg,
+		TemporalClient:       &temporal.Client{Client: temporalClient},
+		DiagnosticsTaskQueue: testhelper.RandomString(),
+		OnboardingsTaskQueue: testhelper.RandomString(),
+	}
+
+	sut := createV1Router(ctx, deps, mux.NewRouter())
+
 	temporalClient.On("ExecuteWorkflow", mock.Anything,
 		mock.MatchedBy(func(opts client.StartWorkflowOptions) bool {
 			// check the workflow options we are configuring
 			return opts.ID == workflowId &&
-				opts.TaskQueue == cfg.Temporal.Worker.TaskQueue &&
+				opts.TaskQueue == deps.OnboardingsTaskQueue &&
 				opts.WorkflowIDReusePolicy == enums.WORKFLOW_ID_REUSE_POLICY_ALLOW_DUPLICATE_FAILED_ONLY &&
 				opts.WorkflowIDConflictPolicy == enums.WORKFLOW_ID_CONFLICT_POLICY_FAIL &&
 				opts.WorkflowExecutionErrorWhenAlreadyStarted == true
@@ -256,11 +266,7 @@ func TestV1PutOnboardingStartsOnboardEntityWithCorrectParams(t *testing.T) {
 				!arg.Timestamp.AsTime().IsZero() &&
 				arg.DeputyOwnerEmail == body.DeputyOwnerEmail
 		})).Once().Return(&testhelper.TestWorkflowRun{WorkflowID: workflowId}, nil)
-	c := &clients.Clients{Temporal: temporalClient}
-	sut := createV1Router(ctx, &V1Dependencies{
-		Clients: c,
-		Config:  cfg,
-	}, mux.NewRouter())
+
 	testserver := httptest.NewServer(sut)
 	defer testserver.Close()
 	jsonBody, err := json.Marshal(&body)
@@ -282,11 +288,18 @@ func TestV1GetOnboardingState(t *testing.T) {
 	A := assert.New(t)
 	ctx := context.Background()
 	workflowId := testhelper.RandomString()
-	cfg := &config.Config{
-		Temporal: &config.TemporalConfig{
-			Worker: &config.TemporalWorker{TaskQueue: testhelper.RandomString()},
-		},
+
+	temporalClient := &testhelper.MockTemporalClient{}
+	cfg := &config.Config{}
+
+	deps := &V1Dependencies{
+		Config:               cfg,
+		TemporalClient:       &temporal.Client{Client: temporalClient},
+		DiagnosticsTaskQueue: testhelper.RandomString(),
+		OnboardingsTaskQueue: testhelper.RandomString(),
 	}
+
+	sut := createV1Router(ctx, deps, mux.NewRouter())
 	state := &queriesv1.EntityOnboardingStateResponse{
 		Id: workflowId,
 		SentRequest: &workflowsv1.OnboardEntityRequest{
@@ -304,18 +317,13 @@ func TestV1GetOnboardingState(t *testing.T) {
 
 	queryResult := &testhelper.TestEncodedValue{Value: &state}
 
-	temporalClient := &testhelper.MockTemporalClient{}
 	temporalClient.On("QueryWorkflow",
 		mock.Anything,
 		mock.Anything,
 		mock.Anything,
 		onboardings.QueryEntityOnboardingState,
 		mock.Anything).Return(queryResult, nil)
-	c := &clients.Clients{Temporal: temporalClient}
-	sut := createV1Router(ctx, &V1Dependencies{
-		Clients: c,
-		Config:  cfg,
-	}, mux.NewRouter())
+
 	testserver := httptest.NewServer(sut)
 	defer testserver.Close()
 	parsedUrl, err := url.Parse(testserver.URL + "/onboardings/" + workflowId)
@@ -345,11 +353,17 @@ func TestV1GetGivenExistingOnboardingFetchesCurrentState(t *testing.T) {
 	A := assert.New(t)
 	ctx := context.Background()
 	workflowId := testhelper.RandomString()
-	cfg := &config.Config{
-		Temporal: &config.TemporalConfig{
-			Worker: &config.TemporalWorker{TaskQueue: testhelper.RandomString()},
-		},
+	temporalClient := &testhelper.MockTemporalClient{}
+	cfg := &config.Config{}
+
+	deps := &V1Dependencies{
+		Config:               cfg,
+		TemporalClient:       &temporal.Client{Client: temporalClient},
+		DiagnosticsTaskQueue: testhelper.RandomString(),
+		OnboardingsTaskQueue: testhelper.RandomString(),
 	}
+
+	sut := createV1Router(ctx, deps, mux.NewRouter())
 	state := &queriesv1.EntityOnboardingStateResponse{
 		Id: workflowId,
 		SentRequest: &workflowsv1.OnboardEntityRequest{
@@ -367,7 +381,6 @@ func TestV1GetGivenExistingOnboardingFetchesCurrentState(t *testing.T) {
 
 	queryResult := &testhelper.TestEncodedValue{Value: &state}
 
-	temporalClient := &testhelper.MockTemporalClient{}
 	temporalClient.On("QueryWorkflow",
 		mock.Anything,
 		mock.Anything,
@@ -375,11 +388,6 @@ func TestV1GetGivenExistingOnboardingFetchesCurrentState(t *testing.T) {
 		onboardings.QueryEntityOnboardingState,
 		mock.Anything).Return(queryResult, nil)
 
-	c := &clients.Clients{Temporal: temporalClient}
-	sut := createV1Router(ctx, &V1Dependencies{
-		Clients: c,
-		Config:  cfg,
-	}, mux.NewRouter())
 	testserver := httptest.NewServer(sut)
 	defer testserver.Close()
 	parsedUrl, err := url.Parse(testserver.URL + "/onboardings/" + workflowId)
@@ -398,24 +406,24 @@ func TestV1GetGivenNonExistingOnboardingReturns404(t *testing.T) {
 	A := assert.New(t)
 	ctx := context.Background()
 	workflowId := testhelper.RandomString()
-	cfg := &config.Config{
-		Temporal: &config.TemporalConfig{
-			Worker: &config.TemporalWorker{TaskQueue: testhelper.RandomString()},
-		},
+	temporalClient := &testhelper.MockTemporalClient{}
+	cfg := &config.Config{}
+
+	deps := &V1Dependencies{
+		Config:               cfg,
+		TemporalClient:       &temporal.Client{Client: temporalClient},
+		DiagnosticsTaskQueue: testhelper.RandomString(),
+		OnboardingsTaskQueue: testhelper.RandomString(),
 	}
 
-	temporalClient := &testhelper.MockTemporalClient{}
+	sut := createV1Router(ctx, deps, mux.NewRouter())
 	temporalClient.On("QueryWorkflow",
 		mock.Anything,
 		workflowId,
 		mock.Anything,
 		onboardings.QueryEntityOnboardingState,
 		mock.Anything).Once().Return(nil, serviceerror.NewNotFound("workflow not found"))
-	c := &clients.Clients{Temporal: temporalClient}
-	sut := createV1Router(ctx, &V1Dependencies{
-		Clients: c,
-		Config:  cfg,
-	}, mux.NewRouter())
+	
 	testserver := httptest.NewServer(sut)
 	defer testserver.Close()
 	parsedUrl, err := url.Parse(testserver.URL + "/onboardings/" + workflowId)

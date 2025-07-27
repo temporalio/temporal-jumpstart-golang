@@ -11,6 +11,9 @@ import (
 )
 
 func CreateAPIRouter(ctx context.Context, cfg *config.Config, clients *clients.Clients) (http.Handler, error) {
+	const temporalNamespace = "default"
+	const taskQueue = "default"
+
 	router := mux.NewRouter()
 	creds := handlers.AllowCredentials()
 	headers := handlers.AllowedHeaders([]string{"X-Requested-With", "Content-Type", "Authorization", "Content-Type"})
@@ -18,15 +21,16 @@ func CreateAPIRouter(ctx context.Context, cfg *config.Config, clients *clients.C
 	origins := handlers.AllowedOrigins([]string{"*"})
 	ttl := handlers.MaxAge(3600)
 
-	temporalClients, exists := clients.Temporals()["default"]
+	temporalClients, exists := clients.Temporals()[temporalNamespace]
 	if !exists {
 		return nil, fmt.Errorf("cannot find clients for namespace 'default'")
 	}
 	v1Router := router.PathPrefix("/api/v1").Subrouter()
 	v1Router = createV1Router(ctx, &V1Dependencies{
-		Clients:        clients,
-		Config:         cfg,
-		TemporalClient: temporalClients[0],
+		Clients:              clients,
+		Config:               cfg,
+		TemporalClient:       temporalClients[0],
+		DiagnosticsTaskQueue: taskQueue,
 	}, v1Router)
 	return handlers.CORS(creds, headers, methods, origins, ttl)(router), nil
 }

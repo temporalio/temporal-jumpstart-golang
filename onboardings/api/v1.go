@@ -29,9 +29,11 @@ import (
 )
 
 type V1Dependencies struct {
-	Clients        *clients.Clients
-	Config         *config.Config
-	TemporalClient *temporal.Client
+	Clients              *clients.Clients
+	Config               *config.Config
+	TemporalClient       *temporal.Client
+	OnboardingsTaskQueue string
+	DiagnosticsTaskQueue string
 }
 
 func createV1Router(ctx context.Context, deps *V1Dependencies, router *mux.Router) *mux.Router {
@@ -40,7 +42,7 @@ func createV1Router(ctx context.Context, deps *V1Dependencies, router *mux.Route
 
 		vars := mux.Vars(r)
 		workflowId := vars["id"]
-		
+
 		result, err := deps.TemporalClient.QueryWorkflow(
 			r.Context(),
 			workflowId,
@@ -80,7 +82,7 @@ func createV1Router(ctx context.Context, deps *V1Dependencies, router *mux.Route
 
 		options := client.StartWorkflowOptions{
 			ID:                                       workflowId,
-			TaskQueue:                                deps.Config.Temporal.Worker.TaskQueue,
+			TaskQueue:                                "default",
 			WorkflowIDReusePolicy:                    enums.WORKFLOW_ID_REUSE_POLICY_ALLOW_DUPLICATE_FAILED_ONLY,
 			WorkflowIDConflictPolicy:                 enums.WORKFLOW_ID_CONFLICT_POLICY_FAIL,
 			WorkflowExecutionErrorWhenAlreadyStarted: true,
@@ -164,7 +166,7 @@ func createV1Router(ctx context.Context, deps *V1Dependencies, router *mux.Route
 
 		options := client.StartWorkflowOptions{
 			ID:        workflowId,
-			TaskQueue: deps.Config.Temporal.Worker.TaskQueue,
+			TaskQueue: deps.OnboardingsTaskQueue,
 			// This configures how to deal with prior attempts of an Onboarding.
 			// We want to allow a "do over" of the Onboarding only if the prior attempts failed.
 			WorkflowIDReusePolicy: enums.WORKFLOW_ID_REUSE_POLICY_ALLOW_DUPLICATE_FAILED_ONLY,

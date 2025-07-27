@@ -21,15 +21,15 @@ import (
 )
 
 type V1Dependencies struct {
-	Clients        *clients.Clients
-	Config         *config.Config
-	TemporalClient *temporal.Client
+	Clients              *clients.Clients
+	Config               *config.Config
+	TemporalClient       *temporal.Client
+	DiagnosticsTaskQueue string
 }
 
 func createV1Router(_ context.Context, deps *V1Dependencies, router *mux.Router) *mux.Router {
 
 	router.HandleFunc("/pings/{id}", func(w http.ResponseWriter, r *http.Request) {
-
 		vars := mux.Vars(r)
 		workflowId := vars["id"]
 
@@ -72,7 +72,7 @@ func createV1Router(_ context.Context, deps *V1Dependencies, router *mux.Router)
 
 		options := client.StartWorkflowOptions{
 			ID:                                       workflowId,
-			TaskQueue:                                "default",
+			TaskQueue:                                deps.DiagnosticsTaskQueue,
 			WorkflowIDReusePolicy:                    enums.WORKFLOW_ID_REUSE_POLICY_ALLOW_DUPLICATE_FAILED_ONLY,
 			WorkflowIDConflictPolicy:                 enums.WORKFLOW_ID_CONFLICT_POLICY_FAIL,
 			WorkflowExecutionErrorWhenAlreadyStarted: true,
