@@ -22,7 +22,18 @@ be copied over and renamed to get going quickly.
 These directories produce the binary (eg `main`) for the [api](#api) and [workers](#workers).
 
 ##### [config](app/config)
-This parses the `.env` you provide to produce configuration used for both services.
+This parses the YAML files you provide to produce configuration used for both services.
+YAML files should provide a `default` environment, such as:
+* `api.default.yaml`
+* `temporal.default.yaml`
+
+You can provide an `environment` to specify config. For example:
+```
+go run cmd/workers/*.go run --environment remote --config-dir config
+``` 
+would use the files:
+* `api.remote.yaml`
+* `temporal.remote.yaml`
 
 ##### [api](app/api)
 This is where [Starter](/docs/foundations/Starters.md) related concerns are found.
